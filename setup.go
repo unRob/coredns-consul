@@ -81,7 +81,7 @@ func parse(c *caddy.Controller) (cc *Catalog, err error) {
 					return nil, c.Errf("Could not parse ttl as golang duration: %v", err)
 				}
 
-				cc.TTL = uint32(ttl)
+				cc.TTL = uint32(ttl.Seconds())
 			default:
 				return nil, c.Errf("unknown property %q", c.Val())
 			}

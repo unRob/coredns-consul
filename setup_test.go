@@ -87,7 +87,10 @@ func TestSetup(t *testing.T) {
 
 			if catalog.Endpoint != tst.endpoint {
 				t.Fatalf("Endpoint doesn't match: %v != %v", catalog.Endpoint, tst.endpoint)
+			}
 
+			if catalog.TTL != tst.ttl {
+				t.Fatalf("TTL doesn't match: %v != %v", catalog.TTL, tst.ttl)
 			}
 		})
 	}
