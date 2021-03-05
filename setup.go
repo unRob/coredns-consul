@@ -3,8 +3,8 @@ package catalog
 import (
 	"time"
 
-	"github.com/caddyserver/caddy"
 	"github.com/cenkalti/backoff/v4"
+	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
 	clog "github.com/coredns/coredns/plugin/pkg/log"

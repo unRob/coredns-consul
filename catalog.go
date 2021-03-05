@@ -95,6 +95,8 @@ func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 	log.Debugf("Found record for %s", name)
 	m := new(dns.Msg)
 	m.SetReply(r)
+	m.Rcode = dns.RcodeSuccess
+	m.Compress = true
 
 	m.Answer = []dns.RR{}
 	header := dns.RR_Header{
