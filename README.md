@@ -21,12 +21,18 @@ With only the plugin specified, the *consul_catalog* plugin will default to the 
 consul_catalog [TAGS...] {
     endpoint URL
     token TOKEN
+    acl_metadata_tag META_TAG
+    acl_zone ZONE_NAME ZONE_CIDR
+    service_proxy PROXY_TAG PROXY_SERVICE
     ttl TTL
 }
 ```
 
 * `endpoint` specifies the **URL** where to find consul catalog, by default `consul.service.consul:8500`.
 * `token` specifies the token to authenticate with the consul service.
+* `acl_metadata_tag` specifies the tag to read acl rules from, by default `coredns-acl`. An ACL rule looks like: `allow network1; deny network2`. Rules are interpreted in order of appearance on the corresponding service's metatag.
+* `acl_zone` adds a zone named **ZONE_NAME** with corresponding **ZONE_CIDR** range.
+* `service_proxy` If specified, services tagged with **PROXY_TAG** will respond with the address for **PROXY_SERVICE** instead. 
 * `ttl` specifies the **TTL** in [golang duration strings](https://golang.org/pkg/time/#ParseDuration) returned for matching service queries, by default 5 minutes.
 
 ## Ready
@@ -48,6 +54,11 @@ example.com {
     consul_catalog coredns.enabled {
         address consul.service.consul:8500
         token CONSUL_ACL_TOKEN
+        acl_metada_tag coredns-consul
+        acl_zone trusted 10.0.0.0/24
+        acl_zone guests 192.168.10.0/24
+        acl_zone iot 192.168.20.0/24
+        acl_zone public 0.0.0.0/24
         ttl 10m
     }
 

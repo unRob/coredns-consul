@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -12,10 +13,10 @@ import (
 	"github.com/miekg/dns"
 )
 
-var defaultTags = []string{"coredns.enabled"}
+var defaultTag = "coredns.enabled"
 var defaultEndpoint = "consul.service.consul:8500"
-var defaultTraefikTag = "traefik.enable=true"
 var defaultTTL = uint32(time.Duration(5 * time.Minute).Seconds())
+var defaultMeta = "coredns-acl"
 var defaultLookup = func(ctx context.Context, state request.Request, target string) (*dns.Msg, error) {
 	recursor := upstream.New()
 	return recursor.Lookup(ctx, state, target, dns.TypeA)
@@ -24,26 +25,37 @@ var defaultLookup = func(ctx context.Context, state request.Request, target stri
 // Catalog holds published Consul Catalog services
 type Catalog struct {
 	sync.RWMutex
-	Endpoint   string
-	Tags       []string
-	services   map[string]string
-	FQDN       []string
-	TTL        uint32
-	Token      string
-	Next       plugin.Handler
-	lastIndex  uint64
-	lastUpdate time.Time
-	ready      bool
+	Endpoint     string
+	Tag          string
+	services     map[string]*Service
+	FQDN         []string
+	TTL          uint32
+	Token        string
+	ProxyService string
+	ProxyTag     string
+	Networks     map[string]*net.IPNet
+	MetadataTag  string
+	Next         plugin.Handler
+	lastIndex    uint64
+	lastUpdate   time.Time
+	ready        bool
+	client       ClientCatalog
 }
 
 // New returns a Catalog plugin
 func New() *Catalog {
 	return &Catalog{
-		Endpoint: defaultEndpoint,
-		TTL:      defaultTTL,
-		Tags:     defaultTags,
-		services: map[string]string{},
+		Endpoint:    defaultEndpoint,
+		TTL:         defaultTTL,
+		Tag:         defaultTag,
+		MetadataTag: defaultMeta,
+		services:    map[string]*Service{},
 	}
+}
+
+// SetClient sets a consul client for a catalog
+func (c *Catalog) SetClient(client ClientCatalog) {
+	c.client = client
 }
 
 // Ready implements ready.Readiness
@@ -57,7 +69,7 @@ func (c *Catalog) LastUpdated() time.Time {
 }
 
 // Services returns a map of services to their target
-func (c *Catalog) Services() map[string]string {
+func (c *Catalog) Services() map[string]*Service {
 	return c.services
 }
 
@@ -78,21 +90,29 @@ func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 	}
 
 	c.RLock()
-	target, exists := c.services[name]
+	svc, exists := c.services[name]
 	c.RUnlock()
 
 	if !exists {
-		log.Debugf("Zone not found: %s", name)
+		Log.Debugf("Zone not found: %s", name)
 		return plugin.NextOrFailure("consul_catalog", c.Next, ctx, w, r)
 	}
 
-	reply, err := defaultLookup(ctx, state, target)
+	if len(c.Networks) > 0 {
+		ip := net.ParseIP(state.IP())
+		if !svc.RespondsTo(ip) {
+			Log.Warningf("Blocked resolution for service %s from ip %s", name, ip)
+			return plugin.NextOrFailure("consul_catalog", c.Next, ctx, w, r)
+		}
+	}
+
+	reply, err := defaultLookup(ctx, state, svc.Target)
 
 	if err != nil {
 		return 0, plugin.Error("Failed to lookup target", err)
 	}
 
-	log.Debugf("Found record for %s", name)
+	Log.Debugf("Found record for %s", name)
 	m := new(dns.Msg)
 	m.SetReply(r)
 	m.Rcode = dns.RcodeSuccess
