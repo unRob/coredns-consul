@@ -132,6 +132,7 @@ func parse(c *caddy.Controller) (cc *Catalog, err error) {
 
 				cc.ProxyTag = remaining[0]
 				cc.ProxyService = remaining[1]
+				Log.Debugf("Found proxy config for tag %s and service %s", cc.ProxyTag, cc.ProxyService)
 			case "config_kv_path":
 				if !c.NextArg() {
 					return nil, c.ArgErr()

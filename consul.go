@@ -205,8 +205,11 @@ func (c *Catalog) FetchServices() error {
 			metadata := hydratedServices[0].ServiceMeta
 			acl, exists := metadata[c.MetadataTag]
 			if !exists {
+				Log.Warningf("No ACL found for %s", svc)
 				continue
 			}
+
+			Log.Debugf("Parsing ACL for %s : %s", svc, acl)
 
 			aclRules := regexp.MustCompile(`;\s*`).Split(acl, -1)
 			for _, rule := range aclRules {
@@ -228,6 +231,8 @@ func (c *Catalog) FetchServices() error {
 				}
 			}
 
+		} else {
+			Log.Warningf("No services found for %s, check the permissions for your token", svc)
 		}
 
 		currentServices[svc] = service

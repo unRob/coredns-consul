@@ -85,6 +85,7 @@ func (c *Catalog) ServiceFor(name string) (svc *Service) {
 	var exists bool
 	c.RLock()
 	if svc, exists = c.staticEntries[name]; !exists {
+		Log.Debugf("Zone missing from static entries %s", name)
 		svc, _ = c.services[name]
 	}
 	c.RUnlock()
