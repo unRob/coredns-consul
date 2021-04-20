@@ -89,7 +89,7 @@ func (c *Catalog) FetchConfig() error {
 	for name, entry := range entries {
 		target := entry.Target
 		if target == "@service_proxy" {
-			if c.ProxyService != "" {
+			if c.ProxyService == "" {
 				Log.Warningf("Ignoring service %s. Requested service proxy but none is configured", name)
 				continue
 			}
