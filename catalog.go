@@ -25,21 +25,25 @@ var defaultLookup = func(ctx context.Context, state request.Request, target stri
 // Catalog holds published Consul Catalog services
 type Catalog struct {
 	sync.RWMutex
-	Endpoint     string
-	Tag          string
-	services     map[string]*Service
-	FQDN         []string
-	TTL          uint32
-	Token        string
-	ProxyService string
-	ProxyTag     string
-	Networks     map[string]*net.IPNet
-	MetadataTag  string
-	Next         plugin.Handler
-	lastIndex    uint64
-	lastUpdate   time.Time
-	ready        bool
-	client       ClientCatalog
+	Endpoint         string
+	Tag              string
+	services         map[string]*Service
+	staticEntries    map[string]*Service
+	FQDN             []string
+	TTL              uint32
+	Token            string
+	ProxyService     string
+	ProxyTag         string
+	Networks         map[string]*net.IPNet
+	MetadataTag      string
+	ConfigKey        string
+	Next             plugin.Handler
+	lastCatalogIndex uint64
+	lastConfigIndex  uint64
+	lastUpdate       time.Time
+	ready            bool
+	client           ClientCatalog
+	kv               KVClient
 }
 
 // New returns a Catalog plugin
@@ -54,8 +58,9 @@ func New() *Catalog {
 }
 
 // SetClient sets a consul client for a catalog
-func (c *Catalog) SetClient(client ClientCatalog) {
+func (c *Catalog) SetClients(client ClientCatalog, kv KVClient) {
 	c.client = client
+	c.kv = kv
 }
 
 // Ready implements ready.Readiness
@@ -76,6 +81,17 @@ func (c *Catalog) Services() map[string]*Service {
 // Name implements plugin.Handler
 func (c *Catalog) Name() string { return "consul_catalog" }
 
+func (c *Catalog) ServiceFor(name string) (svc *Service) {
+	var exists bool
+	c.RLock()
+	if svc, exists = c.staticEntries[name]; !exists {
+		svc, _ = c.services[name]
+	}
+	c.RUnlock()
+
+	return
+}
+
 // ServeDNS implements plugin.Handler
 func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	state := request.Request{W: w, Req: r}
@@ -89,11 +105,9 @@ func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 		name = strings.Replace(name, "."+fqdn, "", 1)
 	}
 
-	c.RLock()
-	svc, exists := c.services[name]
-	c.RUnlock()
+	svc := c.ServiceFor(name)
 
-	if !exists {
+	if svc == nil {
 		Log.Debugf("Zone not found: %s", name)
 		return plugin.NextOrFailure("consul_catalog", c.Next, ctx, w, r)
 	}

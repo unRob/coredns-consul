@@ -110,6 +110,38 @@ func (c *TestCatalogClient) Services(*api.QueryOptions) (map[string][]string, *a
 	return services, &api.QueryMeta{LastIndex: c.lastIndex}, nil
 }
 
+type TestKVClient struct{}
+
+func NewTestKVClient() KVClient {
+	return &TestKVClient{}
+}
+
+func (kv *TestKVClient) Get(path string, opts *api.QueryOptions) (*api.KVPair, *api.QueryMeta, error) {
+	data := []byte(`{"consul": {"target": "traefik", "acl": ["allow private"]}}`)
+	return &api.KVPair{
+		Value: data,
+	}, &api.QueryMeta{LastIndex: 1}, nil
+}
+
+func TestFetchConfig(t *testing.T) {
+	c, _ := NewTestCatalog(false)
+	err := c.FetchConfig()
+
+	if err != nil {
+		t.Fatalf("Failed fetching config, %s", err)
+	}
+
+	svc := c.ServiceFor("consul")
+	if svc == nil {
+		t.Fatalf("Service consul not found")
+	}
+
+	if svc.Target != "traefik.service.consul." {
+		t.Fatalf("Unexpected target: %v", svc.Target)
+	}
+
+}
+
 func TestFetchServices(t *testing.T) {
 	c, client := NewTestCatalog(true)
 

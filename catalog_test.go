@@ -26,8 +26,10 @@ func NewTestCatalog(fetch bool) (*Catalog, ClientCatalog) {
 	c.Networks["guest"] = guest
 	_, public, _ := net.ParseCIDR("0.0.0.0/0")
 	c.Networks["public"] = public
+	c.ConfigKey = "some/kv/path"
 	client := NewTestCatalogClient()
-	c.SetClient(client)
+	kvClient := NewTestKVClient()
+	c.SetClients(client, kvClient)
 
 	if fetch {
 		c.FetchServices()

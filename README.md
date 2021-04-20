@@ -24,6 +24,7 @@ consul_catalog [TAGS...] {
     acl_metadata_tag META_TAG
     acl_zone ZONE_NAME ZONE_CIDR
     service_proxy PROXY_TAG PROXY_SERVICE
+    config_kv_path CONSUL_KV_PATH
     ttl TTL
 }
 ```
@@ -32,7 +33,20 @@ consul_catalog [TAGS...] {
 * `token` specifies the token to authenticate with the consul service.
 * `acl_metadata_tag` specifies the tag to read acl rules from, by default `coredns-acl`. An ACL rule looks like: `allow network1; deny network2`. Rules are interpreted in order of appearance on the corresponding service's metatag.
 * `acl_zone` adds a zone named **ZONE_NAME** with corresponding **ZONE_CIDR** range.
-* `service_proxy` If specified, services tagged with **PROXY_TAG** will respond with the address for **PROXY_SERVICE** instead. 
+* `service_proxy` If specified, services tagged with **PROXY_TAG** will respond with the address for **PROXY_SERVICE** instead.
+* `config_kv_path` If specified, consul's kv store will be queried for **CONSUL_KV_PATH** and specified entries will be served before querying for catalog records. The value at **CONSUL_KV_PATH** must contain json in following this schema:
+    ```jsonc
+    {
+        "myCatalogService": {
+            "target": "serviceA", // the name of a service registered with consul
+            "acl": ["allow network1", "deny network2"] // a list of ACL rules
+        },
+        "myServiceProxyService": {
+            "target": "@service_proxy", // a run-time alias for acl_zone's PROXY_SERVICE
+            "acl": ["allow network1"],
+        }
+    }
+    ```
 * `ttl` specifies the **TTL** in [golang duration strings](https://golang.org/pkg/time/#ParseDuration) returned for matching service queries, by default 5 minutes.
 
 ## Ready

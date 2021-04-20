@@ -30,6 +30,10 @@ func setup(c *caddy.Controller) error {
 		Log.Errorf("Could not obtain services from catalog, retrying in %vs: %v", cooldown.Truncate(time.Second), err)
 	}
 
+	onUpdateKVError := func(err error, cooldown time.Duration) {
+		Log.Errorf("Could not obtain config from consul, retrying in %vs: %v", cooldown.Truncate(time.Second), err)
+	}
+
 	c.OnStartup(func() error {
 		Log.Infof("Starting consul catalog watch at %s", catalog.Endpoint)
 
@@ -46,6 +50,24 @@ func setup(c *caddy.Controller) error {
 				}
 			}
 		}()
+
+		if catalog.ConfigKey != "" {
+			Log.Infof("Starting consul kv watch at %s/kv/%s", catalog.Endpoint, catalog.ConfigKey)
+
+			go func() {
+				// poll for changes, backing off in case of failures
+				for {
+					Log.Debug("Waiting for consul kv config...")
+
+					err := backoff.RetryNotify(catalog.FetchConfig, backoff.NewExponentialBackOff(), onUpdateKVError)
+
+					if err != nil {
+						plugin.Error("Failed to obtain kv config", err)
+						continue
+					}
+				}
+			}()
+		}
 		return nil
 	})
 
@@ -105,11 +127,17 @@ func parse(c *caddy.Controller) (cc *Catalog, err error) {
 			case "service_proxy":
 				remaining := c.RemainingArgs()
 				if len(remaining) < 1 {
-					return nil, c.Errf("ttl needs a time in second")
+					return nil, c.Errf("service_proxy needs a tag and service")
 				}
 
 				cc.ProxyTag = remaining[0]
 				cc.ProxyService = remaining[1]
+			case "config_kv_path":
+				if !c.NextArg() {
+					return nil, c.ArgErr()
+				}
+
+				cc.ConfigKey = c.Val()
 			default:
 				return nil, c.Errf("unknown property %q", c.Val())
 			}
@@ -118,11 +146,11 @@ func parse(c *caddy.Controller) (cc *Catalog, err error) {
 
 	cc.Networks = networks
 
-	client, err := CreateClient(cc.Endpoint, token)
+	catalogClient, kvClient, err := CreateClient(cc.Endpoint, token)
 	if err != nil {
 		return nil, c.Errf("Could not create consul client: %v", err)
 	}
-	cc.SetClient(client)
+	cc.SetClients(catalogClient, kvClient)
 
 	for _, server := range c.ServerBlockKeys {
 		cc.FQDN = append(cc.FQDN, plugin.Host(server).Normalize())
