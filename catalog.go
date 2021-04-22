@@ -19,7 +19,8 @@ var defaultTTL = uint32(time.Duration(5 * time.Minute).Seconds())
 var defaultMeta = "coredns-acl"
 var defaultLookup = func(ctx context.Context, state request.Request, target string) (*dns.Msg, error) {
 	recursor := upstream.New()
-	return recursor.Lookup(ctx, state, target, dns.TypeA)
+	req := state.NewWithQuestion(target, dns.TypeA)
+	return recursor.Lookup(ctx, req, target, dns.TypeA)
 }
 
 // Catalog holds published Consul Catalog services
