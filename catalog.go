@@ -98,7 +98,7 @@ func (c *Catalog) ServiceFor(name string) (svc *Service) {
 func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	state := request.Request{W: w, Req: r}
 
-	if state.QType() != dns.TypeA {
+	if state.QType() != dns.TypeA && state.QType() != dns.TypeAAAA {
 		return plugin.NextOrFailure("consul_catalog", c.Next, ctx, w, r)
 	}
 
@@ -131,24 +131,27 @@ func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 	Log.Debugf("Found record for %s", name)
 	m := new(dns.Msg)
 	m.SetReply(r)
+	m.Authoritative = true
 	m.Rcode = dns.RcodeSuccess
 	m.Compress = true
 
 	m.Answer = []dns.RR{}
 	header := dns.RR_Header{
 		Name:   state.QName(),
-		Rrtype: dns.TypeA,
+		Rrtype: state.QType(),
 		Class:  dns.ClassINET,
 		Ttl:    c.TTL,
 	}
 
-	for _, a := range reply.Answer {
-		switch record := a.(type) {
-		case *dns.A:
-			m.Answer = append(m.Answer, &dns.A{
-				Hdr: header,
-				A:   record.A,
-			})
+	if state.QType() == dns.TypeA {
+		for _, a := range reply.Answer {
+			switch record := a.(type) {
+			case *dns.A:
+				m.Answer = append(m.Answer, &dns.A{
+					Hdr: header,
+					A:   record.A,
+				})
+			}
 		}
 	}
 
