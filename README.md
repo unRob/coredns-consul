@@ -76,6 +76,8 @@ example.com {
         ttl 10m
     }
 
+    # if a SOA is specified in this file, it'll be added
+    # to responses from consul services
     file zones/example.com
 }
 

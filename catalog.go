@@ -2,12 +2,14 @@ package catalog
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/coredns/coredns/plugin"
+	"github.com/coredns/coredns/plugin/file"
 	"github.com/coredns/coredns/plugin/pkg/upstream"
 	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
@@ -39,6 +41,7 @@ type Catalog struct {
 	MetadataTag      string
 	ConfigKey        string
 	Next             plugin.Handler
+	Zone             string
 	lastCatalogIndex uint64
 	lastConfigIndex  uint64
 	lastUpdate       time.Time
@@ -96,11 +99,7 @@ func (c *Catalog) ServiceFor(name string) (svc *Service) {
 
 // ServeDNS implements plugin.Handler
 func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
-	state := request.Request{W: w, Req: r}
-
-	if state.QType() != dns.TypeA && state.QType() != dns.TypeAAAA {
-		return plugin.NextOrFailure("consul_catalog", c.Next, ctx, w, r)
-	}
+	state := request.Request{W: w, Req: r, Zone: c.Zone}
 
 	name := state.QName()
 	for _, fqdn := range c.FQDN {
@@ -122,13 +121,6 @@ func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 		}
 	}
 
-	reply, err := defaultLookup(ctx, state, svc.Target)
-
-	if err != nil {
-		return 0, plugin.Error("Failed to lookup target", err)
-	}
-
-	Log.Debugf("Found record for %s", name)
 	m := new(dns.Msg)
 	m.SetReply(r)
 	m.Authoritative = true
@@ -143,7 +135,45 @@ func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 		Ttl:    c.TTL,
 	}
 
-	if state.QType() == dns.TypeA {
+	if fp, ok := c.Next.(file.File); ok && len(fp.Zones.Z) > 0 {
+		// grab the SOA from the file plugin, if available and next in the chain
+		if zone, ok := fp.Zones.Z[c.FQDN[0]]; ok {
+			Log.Debugf("Adding SOA %s", zone.SOA.String())
+			m.Ns = []dns.RR{zone.SOA}
+		}
+	}
+
+	if state.QType() != dns.TypeA {
+		// return NODATA
+		Log.Debugf("Record for %s does not contain answers for type %s", name, state.Type())
+		w.WriteMsg(m)
+		return dns.RcodeSuccess, nil
+	}
+
+	lookupName := svc.Target
+	if svc.Target == "@service_proxy" {
+		lookupName = c.ProxyService
+	}
+
+	Log.Debugf("looking up target: %s", lookupName)
+
+	if target := c.ServiceFor(lookupName); target != nil && len(target.Addresses) > 0 {
+		Log.Debugf("Found addresses in catalog for %s: %v", lookupName, target.Addresses)
+		for _, addr := range target.Addresses {
+			m.Answer = append(m.Answer, &dns.A{
+				Hdr: header,
+				A:   addr,
+			})
+		}
+	} else {
+		Log.Debugf("Looking up address for %s upstream", lookupName)
+		reply, err := defaultLookup(ctx, state, fmt.Sprintf("%s.service.consul", lookupName))
+
+		if err != nil {
+			return 0, plugin.Error("Failed to lookup target upstream", err)
+		}
+		Log.Debugf("Found record for %s upstream", name)
+
 		for _, a := range reply.Answer {
 			switch record := a.(type) {
 			case *dns.A:

@@ -21,8 +21,10 @@ func setup(c *caddy.Controller) error {
 		return plugin.Error("Failed to parse", err)
 	}
 
-	dnsserver.GetConfig(c).AddPlugin(func(next plugin.Handler) plugin.Handler {
+	config := dnsserver.GetConfig(c)
+	config.AddPlugin(func(next plugin.Handler) plugin.Handler {
 		catalog.Next = next
+		catalog.Zone = config.Zone
 		return catalog
 	})
 

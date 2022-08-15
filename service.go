@@ -12,8 +12,10 @@ type ServiceACL struct {
 
 // Service has a target and ACL rules
 type Service struct {
-	Target string
-	ACL    []*ServiceACL
+	Name      string
+	Target    string
+	ACL       []*ServiceACL
+	Addresses []net.IP
 }
 
 // RespondsTo returns if a service is allowed to talk to an IP
