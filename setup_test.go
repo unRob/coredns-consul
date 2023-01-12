@@ -1,7 +1,8 @@
+// Copyright © 2022 Roberto Hidalgo <coredns-consul@un.rob.mx>
+// SPDX-License-Identifier: Apache-2.0
 package catalog
 
 import (
-	"fmt"
 	"net"
 	"testing"
 
@@ -131,14 +132,10 @@ func TestSetup(t *testing.T) {
 			for name, cidr := range catalog.Networks {
 				if expectedCIDR, ok := tst.networks[name]; !ok {
 					t.Fatalf("Networks missing %s", name)
-				} else {
-					if fmt.Sprintf("%s", expectedCIDR) != fmt.Sprintf("%s", cidr) {
-						t.Fatalf("Wrong CIDR found: %s, expected %s", cidr, expectedCIDR)
-					}
+				} else if expectedCIDR.String() != cidr.String() {
+					t.Fatalf("Wrong CIDR found: %s, expected %s", cidr, expectedCIDR)
 				}
 			}
-
 		})
 	}
-
 }

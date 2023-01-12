@@ -1,3 +1,5 @@
+// Copyright © 2022 Roberto Hidalgo <coredns-consul@un.rob.mx>
+// SPDX-License-Identifier: Apache-2.0
 package catalog
 
 import (
@@ -17,7 +19,7 @@ import (
 
 var defaultTag = "coredns.enabled"
 var defaultEndpoint = "consul.service.consul:8500"
-var defaultTTL = uint32(time.Duration(5 * time.Minute).Seconds())
+var defaultTTL = uint32((5 * time.Minute).Seconds())
 var defaultMeta = "coredns-acl"
 var defaultLookup = func(ctx context.Context, state request.Request, target string) (*dns.Msg, error) {
 	recursor := upstream.New()
@@ -25,7 +27,7 @@ var defaultLookup = func(ctx context.Context, state request.Request, target stri
 	return recursor.Lookup(ctx, req, target, dns.TypeA)
 }
 
-// Catalog holds published Consul Catalog services
+// Catalog holds published Consul Catalog services.
 type Catalog struct {
 	sync.RWMutex
 	Endpoint         string
@@ -50,7 +52,7 @@ type Catalog struct {
 	kv               KVClient
 }
 
-// New returns a Catalog plugin
+// New returns a Catalog plugin.
 func New() *Catalog {
 	return &Catalog{
 		Endpoint:    defaultEndpoint,
@@ -61,28 +63,28 @@ func New() *Catalog {
 	}
 }
 
-// SetClient sets a consul client for a catalog
+// SetClient sets a consul client for a catalog.
 func (c *Catalog) SetClients(client ClientCatalog, kv KVClient) {
 	c.client = client
 	c.kv = kv
 }
 
-// Ready implements ready.Readiness
+// Ready implements ready.Readiness.
 func (c *Catalog) Ready() bool {
 	return c.ready
 }
 
-// LastUpdated returns the last time services changed
+// LastUpdated returns the last time services changed.
 func (c *Catalog) LastUpdated() time.Time {
 	return c.lastUpdate
 }
 
-// Services returns a map of services to their target
+// Services returns a map of services to their target.
 func (c *Catalog) Services() map[string]*Service {
 	return c.services
 }
 
-// Name implements plugin.Handler
+// Name implements plugin.Handler.
 func (c *Catalog) Name() string { return "consul_catalog" }
 
 func (c *Catalog) ServiceFor(name string) (svc *Service) {
@@ -90,14 +92,14 @@ func (c *Catalog) ServiceFor(name string) (svc *Service) {
 	c.RLock()
 	if svc, exists = c.staticEntries[name]; !exists {
 		Log.Debugf("Zone missing from static entries %s", name)
-		svc, _ = c.services[name]
+		svc = c.services[name]
 	}
 	c.RUnlock()
 
 	return
 }
 
-// ServeDNS implements plugin.Handler
+// ServeDNS implements plugin.Handler.
 func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	state := request.Request{W: w, Req: r, Zone: c.Zone}
 
@@ -146,8 +148,8 @@ func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 	if state.QType() != dns.TypeA {
 		// return NODATA
 		Log.Debugf("Record for %s does not contain answers for type %s", name, state.Type())
-		w.WriteMsg(m)
-		return dns.RcodeSuccess, nil
+		err := w.WriteMsg(m)
+		return dns.RcodeSuccess, err
 	}
 
 	lookupName := svc.Target
@@ -175,16 +177,19 @@ func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 		Log.Debugf("Found record for %s upstream", name)
 
 		for _, a := range reply.Answer {
-			switch record := a.(type) {
-			case *dns.A:
-				m.Answer = append(m.Answer, &dns.A{
-					Hdr: header,
-					A:   record.A,
-				})
+			record, ok := a.(*dns.A)
+			if !ok {
+				Log.Warningf("Found non-A record upstream: %s", a.String())
+				continue
 			}
+
+			m.Answer = append(m.Answer, &dns.A{
+				Hdr: header,
+				A:   record.A,
+			})
 		}
 	}
 
-	w.WriteMsg(m)
-	return dns.RcodeSuccess, nil
+	err := w.WriteMsg(m)
+	return dns.RcodeSuccess, err
 }

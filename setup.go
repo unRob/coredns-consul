@@ -1,3 +1,5 @@
+// Copyright © 2022 Roberto Hidalgo <coredns-consul@un.rob.mx>
+// SPDX-License-Identifier: Apache-2.0
 package catalog
 
 import (
@@ -47,7 +49,7 @@ func setup(c *caddy.Controller) error {
 				err := backoff.RetryNotify(catalog.FetchServices, backoff.NewExponentialBackOff(), onUpdateError)
 
 				if err != nil {
-					plugin.Error("Failed to obtain services from catalog", err)
+					Log.Error(plugin.Error("Failed to obtain services from catalog", err))
 					continue
 				}
 			}
@@ -64,7 +66,7 @@ func setup(c *caddy.Controller) error {
 					err := backoff.RetryNotify(catalog.FetchConfig, backoff.NewExponentialBackOff(), onUpdateKVError)
 
 					if err != nil {
-						plugin.Error("Failed to obtain kv config", err)
+						Log.Error(plugin.Error("Failed to obtain kv config", err))
 						continue
 					}
 				}

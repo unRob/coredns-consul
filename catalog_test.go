@@ -1,3 +1,5 @@
+// Copyright © 2022 Roberto Hidalgo <coredns-consul@un.rob.mx>
+// SPDX-License-Identifier: Apache-2.0
 package catalog
 
 import (
@@ -32,7 +34,10 @@ func NewTestCatalog(fetch bool) (*Catalog, ClientCatalog) {
 	c.SetClients(client, kvClient)
 
 	if fetch {
-		c.FetchServices()
+		err := c.FetchServices()
+		if err != nil {
+			panic(err)
+		}
 	}
 	return c, client
 }
@@ -47,7 +52,7 @@ func TestServeDNS(t *testing.T) {
 	c, _ := NewTestCatalog(true)
 
 	for !c.Ready() {
-		time.Sleep(10)
+		time.Sleep(1 * time.Second)
 	}
 
 	defaultLookup = func(ctx context.Context, req request.Request, target string) (*dns.Msg, error) {
@@ -146,7 +151,7 @@ func TestServeDNS(t *testing.T) {
 				it.Fatalf("Expected error %v, got %s", tc.expectedErr, err)
 			}
 
-			if code != int(tc.expectedCode) {
+			if code != tc.expectedCode {
 				it.Fatalf("Test %d: Expected status code %d, but got %d", i, tc.expectedCode, code)
 			}
 
@@ -165,6 +170,5 @@ func TestServeDNS(t *testing.T) {
 				}
 			}
 		})
-
 	}
 }

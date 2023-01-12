@@ -1,3 +1,5 @@
+// Copyright © 2022 Roberto Hidalgo <coredns-consul@un.rob.mx>
+// SPDX-License-Identifier: Apache-2.0
 package catalog
 
 import (
@@ -125,9 +127,8 @@ func (kv *TestKVClient) Get(path string, opts *api.QueryOptions) (*api.KVPair, *
 
 func TestFetchConfig(t *testing.T) {
 	c, _ := NewTestCatalog(false)
-	err := c.FetchConfig()
 
-	if err != nil {
+	if err := c.FetchConfig(); err != nil {
 		t.Fatalf("Failed fetching config, %s", err)
 	}
 
@@ -136,10 +137,9 @@ func TestFetchConfig(t *testing.T) {
 		t.Fatalf("Service consul not found")
 	}
 
-	if svc.Target != "traefik.service.consul." {
+	if svc.Target != "traefik" {
 		t.Fatalf("Unexpected target: %v", svc.Target)
 	}
-
 }
 
 func TestFetchServices(t *testing.T) {
@@ -161,7 +161,7 @@ func TestFetchServices(t *testing.T) {
 			t.Fatalf("Expected service %s not found", svc)
 		}
 
-		if target.Target != fmt.Sprintf("%s.service.consul.", expected) {
+		if target.Target != expected {
 			t.Fatalf("Unexpected target: %v", target)
 		}
 	}
@@ -183,14 +183,15 @@ func TestFetchServices(t *testing.T) {
 
 	testclient := client.(*TestCatalogClient)
 	testclient.DeleteService("git")
-	c.FetchServices()
-	// if lastUpdate == c.LastUpdated() {
-	// 	t.Fatalf("Services did not change after update")
-	// }
-
-	newCount := len(c.Services())
-	if newCount != 2 {
-		t.Fatalf("Unexpected number of services after update: %d", newCount)
+	if err := c.FetchServices(); err != nil {
+		t.Fatalf("could not fetch services: %s", err)
 	}
 
+	if lastUpdate == c.LastUpdated() {
+		t.Fatalf("Services did not change after update")
+	}
+
+	if newCount := len(c.Services()); newCount != 2 {
+		t.Fatalf("Unexpected number of services after update: %d", newCount)
+	}
 }
