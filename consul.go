@@ -32,11 +32,15 @@ type KVEntries struct {
 }
 
 // CreateClient initializes the consul catalog client.
-func CreateClient(endpoint string, token string) (catalog ClientCatalog, kv KVClient, err error) {
+func CreateClient(scheme, endpoint, token string) (catalog ClientCatalog, kv KVClient, err error) {
 	cfg := api.DefaultConfig()
 	cfg.Address = endpoint
 	if token != "" {
 		cfg.Token = token
+	}
+
+	if scheme == "https" {
+		cfg.Scheme = "https"
 	}
 
 	client, err := api.NewClient(cfg)

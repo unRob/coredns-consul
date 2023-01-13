@@ -96,6 +96,11 @@ func parse(c *caddy.Controller) (cc *Catalog, err error) {
 					return nil, c.ArgErr()
 				}
 				cc.Endpoint = c.Val()
+			case "scheme":
+				if !c.NextArg() {
+					return nil, c.ArgErr()
+				}
+				cc.Scheme = c.Val()
 			case "token":
 				if !c.NextArg() {
 					return nil, c.ArgErr()
@@ -151,7 +156,7 @@ func parse(c *caddy.Controller) (cc *Catalog, err error) {
 
 	cc.Networks = networks
 
-	catalogClient, kvClient, err := CreateClient(cc.Endpoint, token)
+	catalogClient, kvClient, err := CreateClient(cc.Scheme, cc.Endpoint, token)
 	if err != nil {
 		return nil, c.Errf("Could not create consul client: %v", err)
 	}

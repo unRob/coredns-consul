@@ -31,6 +31,7 @@ var defaultLookup = func(ctx context.Context, state request.Request, target stri
 type Catalog struct {
 	sync.RWMutex
 	Endpoint         string
+	Scheme           string
 	Tag              string
 	services         map[string]*Service
 	staticEntries    map[string]*Service
@@ -56,6 +57,7 @@ type Catalog struct {
 func New() *Catalog {
 	return &Catalog{
 		Endpoint:    defaultEndpoint,
+		Scheme:      "http",
 		TTL:         defaultTTL,
 		Tag:         defaultTag,
 		MetadataTag: defaultMeta,
