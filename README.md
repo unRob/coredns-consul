@@ -1,5 +1,7 @@
 # consul_catalog
 
+[![Coverage Status](https://coveralls.io/repos/github/unRob/coredns-consul/badge.svg)](https://coveralls.io/github/unRob/coredns-consul)
+
 ## Name
 
 *consul_catalog* - enables serving A resources for tagged consul services.
