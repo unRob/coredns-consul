@@ -34,4 +34,4 @@ jobs:
       - name: Send coverage
         uses: shogo82148/actions-goveralls@v1
         with:
-          path-to-profile: coverage.cov
+          path-to-profile: coverage.out
