@@ -71,7 +71,7 @@ func setup(c *caddy.Controller) error {
 	return nil
 }
 
-func parse(c *caddy.Controller) (cc *Catalog, err error) {
+func parse(c *caddy.Controller) (cc *Catalog, err error) { // nolint: gocyclo
 	cc = New()
 
 	token := ""

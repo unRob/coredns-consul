@@ -49,7 +49,6 @@ consul_catalog [TAGS...] {
 * `acl_metadata_tag` (default: `coredns-acl`) specifies the Consul Metadata tag to read ACL rules from. An ACL rule looks like: `allow network1; deny network2`. Rules are interpreted in order of appearance. If specified, requests will only receive answers when their IP address corresponds to any of the allowed `acl_zone`s' CIDR ranges for a service.
 * `acl_zone` adds an ACL zone named **ZONE_NAME** with corresponding **ZONE_CIDR** range.
 * `service_proxy` If specified, services tagged with **PROXY_TAG** will respond with the address for **PROXY_SERVICE** instead.
-<!-- * `service_target_metadata_tag` (default: `coredns-acl`) specifies the tag to read target destinations from for a service. An ACL rule looks like: `allow network1; deny network2`. Rules are interpreted in order of appearance on the corresponding service's metatag. -->
 * `alias_metadata_tag` (default: `coredns-alias`) specifies the Consul Metadata tag to read aliases to setup for service. Aliases are semicolon separated dns prefixes that reply with the same target as the original service. For example: `coredns-alias = "*.myservice; client.myservice"`.
 * `static_entries_path` If specified, consul's kv store will be queried at **CONSUL_KV_PATH** and specified entries will be served before querying for catalog records. The value at **CONSUL_KV_PATH** must contain json following this schema:
     ```jsonc

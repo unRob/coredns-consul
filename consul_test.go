@@ -8,6 +8,8 @@ import (
 	. "github.com/unRob/coredns-consul"
 )
 
+var serviceProxyName = "traefik"
+
 func TestFetchStaticServiceKey(t *testing.T) {
 	src := NewWatch(&WatchKVPath{Key: "static/path"})
 	c, _, _ := NewTestCatalog(true, src)
@@ -17,7 +19,7 @@ func TestFetchStaticServiceKey(t *testing.T) {
 		t.Fatalf("Service static-consul not found, got: %+v", c.Services())
 	}
 
-	if svc.Target != "traefik" {
+	if svc.Target != serviceProxyName {
 		t.Fatalf("Unexpected target: %v", svc.Target)
 	}
 }
@@ -31,7 +33,7 @@ func TestFetchStaticServicePrefix(t *testing.T) {
 		t.Fatalf("Service consul not found")
 	}
 
-	if svc.Target != "traefik" {
+	if svc.Target != serviceProxyName {
 		t.Fatalf("Unexpected target: %v", svc.Target)
 	}
 }
@@ -45,9 +47,9 @@ func TestFetchServices(t *testing.T) {
 	}
 
 	svcTests := map[string]string{
-		"nomad":   "traefik",
-		"traefik": "traefik",
-		"git":     "git",
+		"nomad":          serviceProxyName,
+		serviceProxyName: serviceProxyName,
+		"git":            "git",
 	}
 	for svc, expected := range svcTests {
 		target, exists := services[svc]

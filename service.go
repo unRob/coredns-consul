@@ -19,7 +19,6 @@ type Service struct {
 	Target    string
 	ACL       []*ServiceACL
 	Addresses []net.IP
-	star      bool
 }
 
 func NewService(name, target string) *Service {
@@ -28,10 +27,6 @@ func NewService(name, target string) *Service {
 		Target:    target,
 		ACL:       []*ServiceACL{},
 		Addresses: []net.IP{},
-	}
-
-	if strings.HasPrefix("*.", name) {
-		svc.star = true
 	}
 
 	return svc
@@ -57,10 +52,6 @@ func (s Service) RespondsTo(ip net.IP) bool {
 	}
 
 	return false
-}
-
-func (s Service) Star() bool {
-	return s.star
 }
 
 type ServiceMap map[string]*Service

@@ -1,3 +1,5 @@
+// Copyright © 2022 Roberto Hidalgo <coredns-consul@un.rob.mx>
+// SPDX-License-Identifier: Apache-2.0
 package catalog
 
 import (

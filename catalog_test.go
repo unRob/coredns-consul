@@ -66,7 +66,7 @@ func TestServeDNS(t *testing.T) {
 			Value: staticServices(),
 		},
 	}
-	tkv.keysIndex += 1
+	tkv.keysIndex++
 
 	if err := c.ReloadAll(); err != nil {
 		t.Fatal(err)

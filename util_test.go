@@ -1,3 +1,5 @@
+// Copyright © 2022 Roberto Hidalgo <coredns-consul@un.rob.mx>
+// SPDX-License-Identifier: Apache-2.0
 package catalog_test
 
 import (
@@ -8,7 +10,7 @@ import (
 	. "github.com/unRob/coredns-consul"
 )
 
-func NewTestCatalog(fetch bool, extraSources ...*Watch) (*Catalog, CatalogClient, KVClient) {
+func NewTestCatalog(fetch bool, extraSources ...*Watch) (*Catalog, Client, KVClient) {
 	c := New()
 	c.FQDN = []string{"example.com."}
 	c.ProxyTag = "traefik.enable=true"
@@ -50,7 +52,7 @@ type testCatalogClient struct {
 	lastIndex uint64
 }
 
-func NewTestCatalogClient() CatalogClient {
+func NewTestCatalogClient() Client {
 	return &testCatalogClient{
 		lastIndex: 4,
 		services: map[string][]*testServiceData{
@@ -169,11 +171,11 @@ func NewTestKVClient() KVClient {
 }
 
 func (kv *testKVClient) Get(path string, opts *api.QueryOptions) (*api.KVPair, *api.QueryMeta, error) {
-	kv.keysIndex += 1
+	kv.keysIndex++
 	return kv.Keys[path], &api.QueryMeta{LastIndex: kv.keysIndex}, nil
 }
 
 func (kv *testKVClient) List(prefix string, opts *api.QueryOptions) (api.KVPairs, *api.QueryMeta, error) {
-	kv.prefixIndex += 1
+	kv.prefixIndex++
 	return kv.Prefixes[prefix], &api.QueryMeta{LastIndex: kv.prefixIndex}, nil
 }

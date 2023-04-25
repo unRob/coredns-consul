@@ -45,7 +45,7 @@ type Catalog struct {
 	Next         plugin.Handler
 	Zone         string
 	lastUpdate   time.Time
-	client       CatalogClient
+	client       Client
 	kv           KVClient
 	Sources      []*Watch
 	metrics      *metrics.Metrics
@@ -64,7 +64,7 @@ func New() *Catalog {
 }
 
 // SetClient sets a consul client for a catalog.
-func (c *Catalog) SetClients(client CatalogClient, kv KVClient) {
+func (c *Catalog) SetClients(client Client, kv KVClient) {
 	c.client = client
 	c.kv = kv
 }

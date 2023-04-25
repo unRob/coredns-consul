@@ -10,8 +10,8 @@ import (
 
 var watchTimeout = 10 * time.Minute
 
-// CatalogClient is implemented by github.com/hashicorp/consul/api.Catalog.
-type CatalogClient interface {
+// Client is implemented by github.com/hashicorp/consul/api.Catalog.
+type Client interface {
 	Service(string, string, *api.QueryOptions) ([]*api.CatalogService, *api.QueryMeta, error)
 	Services(*api.QueryOptions) (map[string][]string, *api.QueryMeta, error)
 }
@@ -23,7 +23,7 @@ type KVClient interface {
 }
 
 // CreateClient initializes the consul catalog client.
-func CreateClient(scheme, endpoint, token string) (catalog CatalogClient, kv KVClient, err error) {
+func CreateClient(scheme, endpoint, token string) (catalog Client, kv KVClient, err error) {
 	cfg := api.DefaultConfig()
 	cfg.Address = endpoint
 	if token != "" {
