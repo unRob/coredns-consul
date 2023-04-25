@@ -1,61 +1,82 @@
 // Copyright © 2022 Roberto Hidalgo <coredns-consul@un.rob.mx>
 // SPDX-License-Identifier: Apache-2.0
-package catalog
+package catalog_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"testing"
 	"time"
 
+	. "github.com/unRob/coredns-consul"
+
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/plugin/pkg/dnstest"
 	"github.com/coredns/coredns/plugin/test"
 	"github.com/coredns/coredns/request"
+	"github.com/hashicorp/consul/api"
 	"github.com/miekg/dns"
 )
 
-func NewTestCatalog(fetch bool) (*Catalog, ClientCatalog) {
-	c := New()
-	c.FQDN = []string{"example.com."}
-	c.ProxyTag = "traefik.enable=true"
-	c.ProxyService = "traefik"
-	c.Networks = map[string]*net.IPNet{}
-	_, private, _ := net.ParseCIDR("192.168.100.0/24")
-	c.Networks["private"] = private
-	_, guest, _ := net.ParseCIDR("192.168.1.0/24")
-	c.Networks["guest"] = guest
-	_, public, _ := net.ParseCIDR("0.0.0.0/0")
-	c.Networks["public"] = public
-	c.ConfigKey = "some/kv/path"
-	client := NewTestCatalogClient()
-	kvClient := NewTestKVClient()
-	c.SetClients(client, kvClient)
+func staticServices() []byte {
+	b, err := json.Marshal(map[string]StaticEntry{
+		"domain": {
+			Target: "traefik",
+			ACL:    []string{"allow private"},
+		},
+		"sub.domain": {
+			Target: "@service_proxy",
+			ACL:    []string{"allow private"},
+		},
+		"*.star": {
+			Target: "@service_proxy",
+			ACL:    []string{"allow private"},
+		},
+		"alias": {
+			Target:  "@service_proxy",
+			ACL:     []string{"allow private"},
+			Aliases: []string{"*.alias"},
+		},
+	})
 
-	if fetch {
-		err := c.FetchServices()
-		if err != nil {
-			panic(err)
-		}
+	if err != nil {
+		panic(err)
 	}
-	return c, client
+
+	return b
 }
 
 func TestServeDNS(t *testing.T) {
+	t.Parallel()
 	allHosts := map[string][]string{
 		"nomad.service.consul.":   {"192.168.100.1"},
 		"traefik.service.consul.": {"192.168.100.2"},
 		"git.service.consul.":     {"192.168.100.3", "192.168.100.4"},
 	}
 
-	c, _ := NewTestCatalog(true)
+	src := NewWatch(&WatchKVPath{Key: "static/path"})
+
+	c, _, kv := NewTestCatalog(true, src)
+	tkv := kv.(*testKVClient)
+	tkv.Keys = map[string]*api.KVPair{
+		"static/path": {
+			Key:   "static/path",
+			Value: staticServices(),
+		},
+	}
+	tkv.keysIndex += 1
+
+	if err := c.ReloadAll(); err != nil {
+		t.Fatal(err)
+	}
 
 	for !c.Ready() {
 		time.Sleep(1 * time.Second)
 	}
 
-	defaultLookup = func(ctx context.Context, req request.Request, target string) (*dns.Msg, error) {
+	DefaultLookup = func(ctx context.Context, req request.Request, target string) (*dns.Msg, error) {
 		res := new(dns.Msg)
 		res.Answer = []dns.RR{}
 		ips, exists := allHosts[target]
@@ -129,6 +150,62 @@ func TestServeDNS(t *testing.T) {
 			expectedErr:   nil,
 			from:          "10.42.0.1",
 		},
+		{
+			qname:         "sub.domain.example.com",
+			qtype:         dns.TypeA,
+			expectedCode:  dns.RcodeSuccess,
+			expectedReply: []string{"192.168.100.2"},
+			expectedErr:   nil,
+			from:          "192.168.100.42",
+		},
+		{
+			qname:         "domain.example.com",
+			qtype:         dns.TypeA,
+			expectedCode:  dns.RcodeSuccess,
+			expectedReply: []string{"192.168.100.2"},
+			expectedErr:   nil,
+			from:          "192.168.100.42",
+		},
+		{
+			qname:         "does-not-exist.example.com",
+			qtype:         dns.TypeA,
+			expectedCode:  dns.RcodeServerFailure,
+			expectedReply: []string{},
+			expectedErr:   plugin.Error("consul_catalog", fmt.Errorf("no next plugin found")),
+			from:          "192.168.100.42",
+		},
+		{
+			qname:         "whatever.star.example.com",
+			qtype:         dns.TypeA,
+			expectedCode:  dns.RcodeSuccess,
+			expectedReply: []string{"192.168.100.2"},
+			expectedErr:   nil,
+			from:          "192.168.100.42",
+		},
+		{
+			qname:         "alias.example.com",
+			qtype:         dns.TypeA,
+			expectedCode:  dns.RcodeSuccess,
+			expectedReply: []string{"192.168.100.2"},
+			expectedErr:   nil,
+			from:          "192.168.100.42",
+		},
+		{
+			qname:         "something.alias.example.com",
+			qtype:         dns.TypeA,
+			expectedCode:  dns.RcodeSuccess,
+			expectedReply: []string{"192.168.100.2"},
+			expectedErr:   nil,
+			from:          "192.168.100.42",
+		},
+		{
+			qname:         "recursive.something.alias.example.com",
+			qtype:         dns.TypeA,
+			expectedCode:  dns.RcodeServerFailure,
+			expectedReply: []string{},
+			expectedErr:   plugin.Error("consul_catalog", fmt.Errorf("no next plugin found")),
+			from:          "192.168.100.42",
+		},
 	}
 
 	ctx := context.TODO()
@@ -156,6 +233,14 @@ func TestServeDNS(t *testing.T) {
 			}
 
 			if len(tc.expectedReply) != 0 {
+				if rec == nil || rec.Msg == nil {
+					t.Fatal("Expected replies, got none")
+				}
+
+				if len(tc.expectedReply) != len(rec.Msg.Answer) {
+					t.Fatalf("Expected %d replies, got %d", len(tc.expectedReply), len(rec.Msg.Answer))
+				}
+
 				for i, expected := range tc.expectedReply {
 					actual, ok := rec.Msg.Answer[i].(*dns.A)
 

@@ -6,12 +6,13 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/coredns/coredns/plugin"
-	"github.com/coredns/coredns/plugin/file"
+	"github.com/coredns/coredns/plugin/metrics"
 	"github.com/coredns/coredns/plugin/pkg/upstream"
 	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
@@ -20,8 +21,9 @@ import (
 var defaultTag = "coredns.enabled"
 var defaultEndpoint = "consul.service.consul:8500"
 var defaultTTL = uint32((5 * time.Minute).Seconds())
-var defaultMeta = "coredns-acl"
-var defaultLookup = func(ctx context.Context, state request.Request, target string) (*dns.Msg, error) {
+var defaultACLTag = "coredns-acl"
+var defaultAliasTag = "coredns-alias"
+var DefaultLookup = func(ctx context.Context, state request.Request, target string) (*dns.Msg, error) {
 	recursor := upstream.New()
 	req := state.NewWithQuestion(target, dns.TypeA)
 	return recursor.Lookup(ctx, req, target, dns.TypeA)
@@ -30,50 +32,46 @@ var defaultLookup = func(ctx context.Context, state request.Request, target stri
 // Catalog holds published Consul Catalog services.
 type Catalog struct {
 	sync.RWMutex
-	Endpoint         string
-	Scheme           string
-	Tag              string
-	services         map[string]*Service
-	staticEntries    map[string]*Service
-	FQDN             []string
-	TTL              uint32
-	Token            string
-	ProxyService     string
-	ProxyTag         string
-	Networks         map[string]*net.IPNet
-	MetadataTag      string
-	ConfigKey        string
-	Next             plugin.Handler
-	Zone             string
-	lastCatalogIndex uint64
-	lastConfigIndex  uint64
-	lastUpdate       time.Time
-	ready            bool
-	client           ClientCatalog
-	kv               KVClient
+	Endpoint     string
+	Scheme       string
+	FQDN         []string
+	TTL          uint32
+	Token        string
+	ProxyService string
+	ProxyTag     string
+	Networks     map[string]*net.IPNet
+	ACLTag       string
+	AliasTag     string
+	Next         plugin.Handler
+	Zone         string
+	lastUpdate   time.Time
+	client       CatalogClient
+	kv           KVClient
+	Sources      []*Watch
+	metrics      *metrics.Metrics
 }
 
 // New returns a Catalog plugin.
 func New() *Catalog {
 	return &Catalog{
-		Endpoint:    defaultEndpoint,
-		Scheme:      "http",
-		TTL:         defaultTTL,
-		Tag:         defaultTag,
-		MetadataTag: defaultMeta,
-		services:    map[string]*Service{},
+		Endpoint: defaultEndpoint,
+		Scheme:   "http",
+		TTL:      defaultTTL,
+		ACLTag:   defaultACLTag,
+		AliasTag: defaultAliasTag,
+		Sources:  []*Watch{},
 	}
 }
 
 // SetClient sets a consul client for a catalog.
-func (c *Catalog) SetClients(client ClientCatalog, kv KVClient) {
+func (c *Catalog) SetClients(client CatalogClient, kv KVClient) {
 	c.client = client
 	c.kv = kv
 }
 
 // Ready implements ready.Readiness.
 func (c *Catalog) Ready() bool {
-	return c.ready
+	return c.client != nil && c.kv != nil
 }
 
 // LastUpdated returns the last time services changed.
@@ -82,116 +80,81 @@ func (c *Catalog) LastUpdated() time.Time {
 }
 
 // Services returns a map of services to their target.
-func (c *Catalog) Services() map[string]*Service {
-	return c.services
+func (c *Catalog) Services() ServiceMap {
+	m := ServiceMap{}
+	for _, src := range c.Sources {
+		for n, s := range src.Known() {
+			if _, ok := m[n]; ok {
+				Log.Warningf("Repeated service named %s from %s", n, src.Name())
+				continue
+			}
+			m[n] = s
+		}
+	}
+
+	return m
 }
 
 // Name implements plugin.Handler.
 func (c *Catalog) Name() string { return "consul_catalog" }
 
-func (c *Catalog) ServiceFor(name string) (svc *Service) {
-	var exists bool
+func (c *Catalog) ServiceFor(name string) *Service {
 	c.RLock()
-	if svc, exists = c.staticEntries[name]; !exists {
-		Log.Debugf("Zone missing from static entries %s", name)
-		svc = c.services[name]
+	defer c.RUnlock()
+	for _, src := range c.Sources {
+		if svc := src.Get(name); svc != nil {
+			return svc
+		}
 	}
-	c.RUnlock()
 
-	return
+	return nil
 }
 
-// ServeDNS implements plugin.Handler.
-func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
-	state := request.Request{W: w, Req: r, Zone: c.Zone}
-
-	name := state.QName()
-	for _, fqdn := range c.FQDN {
-		name = strings.Replace(name, "."+fqdn, "", 1)
-	}
-
-	svc := c.ServiceFor(name)
-
-	if svc == nil {
-		Log.Debugf("Zone not found: %s", name)
-		return plugin.NextOrFailure("consul_catalog", c.Next, ctx, w, r)
-	}
-
-	if len(c.Networks) > 0 {
-		ip := net.ParseIP(state.IP())
-		if !svc.RespondsTo(ip) {
-			Log.Warningf("Blocked resolution for service %s from ip %s", name, ip)
-			return plugin.NextOrFailure("consul_catalog", c.Next, ctx, w, r)
-		}
-	}
-
-	m := new(dns.Msg)
-	m.SetReply(r)
-	m.Authoritative = true
-	m.Rcode = dns.RcodeSuccess
-	m.Compress = true
-
-	m.Answer = []dns.RR{}
-	header := dns.RR_Header{
-		Name:   state.QName(),
-		Rrtype: state.QType(),
-		Class:  dns.ClassINET,
-		Ttl:    c.TTL,
-	}
-
-	if fp, ok := c.Next.(file.File); ok && len(fp.Zones.Z) > 0 {
-		// grab the SOA from the file plugin, if available and next in the chain
-		if zone, ok := fp.Zones.Z[c.FQDN[0]]; ok {
-			Log.Debugf("Adding SOA %s", zone.SOA.String())
-			m.Ns = []dns.RR{zone.SOA}
-		}
-	}
-
-	if state.QType() != dns.TypeA {
-		// return NODATA
-		Log.Debugf("Record for %s does not contain answers for type %s", name, state.Type())
-		err := w.WriteMsg(m)
-		return dns.RcodeSuccess, err
-	}
-
-	lookupName := svc.Target
-	if svc.Target == "@service_proxy" {
-		lookupName = c.ProxyService
-	}
-
-	Log.Debugf("looking up target: %s", lookupName)
-
-	if target := c.ServiceFor(lookupName); target != nil && len(target.Addresses) > 0 {
-		Log.Debugf("Found addresses in catalog for %s: %v", lookupName, target.Addresses)
-		for _, addr := range target.Addresses {
-			m.Answer = append(m.Answer, &dns.A{
-				Hdr: header,
-				A:   addr,
-			})
-		}
-	} else {
-		Log.Debugf("Looking up address for %s upstream", lookupName)
-		reply, err := defaultLookup(ctx, state, fmt.Sprintf("%s.service.consul", lookupName))
-
+func (c *Catalog) ReloadAll() error {
+	didUpdate := false
+	for _, src := range c.Sources {
+		changed, err := src.Resolve(c)
 		if err != nil {
-			return 0, plugin.Error("Failed to lookup target upstream", err)
+			return err
 		}
-		Log.Debugf("Found record for %s upstream", name)
-
-		for _, a := range reply.Answer {
-			record, ok := a.(*dns.A)
-			if !ok {
-				Log.Warningf("Found non-A record upstream: %s", a.String())
-				continue
-			}
-
-			m.Answer = append(m.Answer, &dns.A{
-				Hdr: header,
-				A:   record.A,
-			})
+		if changed {
+			didUpdate = true
 		}
 	}
 
-	err := w.WriteMsg(m)
-	return dns.RcodeSuccess, err
+	if didUpdate {
+		c.Lock()
+		c.lastUpdate = time.Now()
+		c.Unlock()
+	}
+
+	return nil
+}
+
+func (c *Catalog) parseACLString(svc *Service, acl string) error {
+	aclRules := regexp.MustCompile(`;\s*`).Split(acl, -1)
+	return c.parseACL(svc, aclRules)
+}
+
+func (c *Catalog) parseACL(svc *Service, rules []string) error {
+	Log.Debugf("Parsing ACL for %s: %s", svc.Name, rules)
+	for _, rule := range rules {
+		ruleParts := strings.SplitN(rule, " ", 2)
+		if len(ruleParts) != 2 {
+			return fmt.Errorf("could not parse acl rule <%s>", rule)
+		}
+		action := ruleParts[0]
+		for _, networkName := range regexp.MustCompile(`,\s*`).Split(ruleParts[1], -1) {
+			if cidr, ok := c.Networks[networkName]; ok {
+				svc.ACL = append(svc.ACL, &ServiceACL{
+					Action:  action,
+					Network: cidr,
+				})
+			} else {
+				return fmt.Errorf("unknown network %s", networkName)
+			}
+		}
+	}
+
+	return nil
 }
