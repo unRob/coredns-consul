@@ -1,4 +1,5 @@
 // Copyright © 2022 Roberto Hidalgo <coredns-consul@un.rob.mx>
+// Contributions by Charles Powell, 2023
 // SPDX-License-Identifier: Apache-2.0
 package catalog
 
