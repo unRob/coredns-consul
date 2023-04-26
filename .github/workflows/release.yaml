@@ -1,12 +1,10 @@
 on:
   push:
-    # tags:
-    #   - "[0-9]+.[0-9]+.[0-9]+-alpha.[0-9]+"
-    #   - "[0-9]+.[0-9]+.[0-9]+-beta.[0-9]+"
-    #   - "[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+"
-    #   - "[0-9]+.[0-9]+.[0-9]+"
-    branches:
-      - roberto-wants-shiny-features-hell-later-regret
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+-alpha.[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+-beta.[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+"
 name: Release
 jobs:
   test:
@@ -32,7 +30,6 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          prerelease: true
           files: |
             dist/*.tgz
             dist/*.shasum
