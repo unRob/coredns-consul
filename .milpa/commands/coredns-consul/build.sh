@@ -14,7 +14,11 @@ root="$(dirname "$MILPA_COMMAND_REPO")"
 build=""
 @tmp.dir build
 read -r coredns version < <(awk '/coredns\/coredns/ {sub(".com", ".com:", $1); print "git@" $1".git", $2}' "$root/go.mod") || @milpa.fail "Could not fetch version from go.mod"
-plugin=$(git remote -v | awk '{ gsub(/(\.git|git@|https:\/\/)/, ""); gsub(":/", "/"); print $2; exit }')
+if [[ "$MILPA_OPT_CLONE_PROTOCOL" == "ssh" ]]; then
+  plugin=$(git remote -v | awk '{ gsub(/(\.git|git@|https:\/\/)/, ""); gsub(":/", "/"); print $2; exit }')
+else
+  plugin="https://$(git remote -v).git"
+fi
 
 ourVersion=$(git describe --tags 2>/dev/null || git describe --always)
 

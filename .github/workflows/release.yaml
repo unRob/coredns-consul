@@ -27,7 +27,7 @@ jobs:
           echo "::group::install milpa"
           curl -L https://milpa.dev/install.sh | bash -
           echo "::group::build packages"
-          milpa coredns-consul build all --verbose
+          milpa coredns-consul build all --verbose --clone-protocol https
 
       - name: Release
         uses: softprops/action-gh-release@v1

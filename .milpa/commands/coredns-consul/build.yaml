@@ -16,3 +16,9 @@ arguments:
         - linux/amd64
         - darwin/amd64
         - darwin/arm64
+options:
+  clone-protocol:
+    description: the protocol to use when cloning coredns
+    default: ssh
+    values:
+      static: [ssh, https]
