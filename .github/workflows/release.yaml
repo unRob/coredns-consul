@@ -1,0 +1,41 @@
+on:
+  push:
+    # tags:
+    #   - "[0-9]+.[0-9]+.[0-9]+-alpha.[0-9]+"
+    #   - "[0-9]+.[0-9]+.[0-9]+-beta.[0-9]+"
+    #   - "[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+"
+    #   - "[0-9]+.[0-9]+.[0-9]+"
+    branches:
+      - roberto-wants-shiny-features-hell-later-regret
+name: Release
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.20.x
+
+      - name: Create packages
+        run: |
+          echo "::group::install milpa"
+          curl -L https://milpa.dev/install.sh | bash -
+          echo "::group::build packages"
+          milpa coredns-consul build all --verbose
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          prerelease: true
+          files: |
+            dist/*.tgz
+            dist/*.shasum
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}

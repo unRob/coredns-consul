@@ -9,6 +9,7 @@ arguments:
     default: [linux/mips64, darwin/arm64]
     values:
       static:
+        - all
         - linux/mips64
         - linux/arm64
         - linux/arm
