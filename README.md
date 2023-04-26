@@ -8,7 +8,13 @@
 
 ## Description
 
-This plugin reads services from the [Consul Catalog](https://www.consul.io/api/catalog.html#list-services), and serves A records from them when tagged with `coredns.enabled`. A "static" list of services can also be served from Consul's KV.
+This plugin reads services from the [Consul Catalog](https://www.consul.io/api/catalog.html#list-services), and serves A records from them when tagged with `coredns.enabled`. A list of services can also be served from Consul's KV.
+
+> ⚠️ While running in my home cluster for 3+ years, this is still **unstable, alpha software** with limited test coverage and a very narrow feature set (that's not likely to change, though).
+
+## Installation
+
+Grab a build from [the releases](https://github.com/unRob/coredns-consul/releases), or follow [these instructions](https://coredns.io/2017/03/01/how-to-add-plugins-to-coredns/#4-hooking-it-up) (tl;dr; add `consul_catalog:github.com/unRob/consul_catalog` to CoreDNS' `plugin.cfg` and `make coredns`). An example Ansible role for installing on a Ubiquiti Edgerouter can be found at [unRob/nidito](https://github.com/unRob/nidito/tree/c8b63f47b1703beb8a29171c1e7fc52abb4ecceb/ansible/roles/coredns).
 
 ## Syntax
 
@@ -51,14 +57,14 @@ consul_catalog [TAGS...] {
 * `acl_metadata_tag` (default: `coredns-acl`) specifies the Consul Metadata tag to read ACL rules from. An ACL rule looks like: `allow network1; deny network2`. Rules are interpreted in order of appearance. If specified, requests will only receive answers when their IP address corresponds to any of the allowed `acl_zone`s' CIDR ranges for a service.
 * `acl_zone` adds an ACL zone named **ZONE_NAME** with corresponding **ZONE_CIDR** range.
 * `service_proxy` If specified, services tagged with **PROXY_TAG** will respond with the address for **PROXY_SERVICE** instead.
-* `alias_metadata_tag` (default: `coredns-alias`) specifies the Consul Metadata tag to read aliases to setup for service. Aliases are semicolon separated dns prefixes that reply with the same target as the original service. For example: `coredns-alias = "*.myservice; client.myservice"`.
+* `alias_metadata_tag` (default: `coredns-alias`) specifies the Consul Metadata tag to read aliases to setup for service. Aliases are semicolon separated dns prefixes that reply with the same target as the original service. For example: `coredns-alias = "*.myservice; client.myservice"`. Aliases that begin with `*.`, are treated as a wildcard prefix that will match any sub-domains of the `zone` (and/or dots after the `*.` prefix).
 * `static_entries_path` If specified, consul's kv store will be queried at **CONSUL_KV_PATH** and specified entries will be served before querying for catalog records. The value at **CONSUL_KV_PATH** must contain json following this schema:
     ```jsonc
     {
         "staticService": { // matches staticService.{coredns_zone}
             "target": "serviceA", // the name of a service registered with consul
             "acl": ["allow network1", "deny network2"], // a list of ACL rules
-            "aliases": ["*.static"]
+            "aliases": ["*.static"] // a list of other names that should also reply with this service's info
         },
         "myServiceProxyService": {
             "target": "@service_proxy", // a run-time alias for acl_zone's PROXY_SERVICE
@@ -74,7 +80,7 @@ consul_catalog [TAGS...] {
         "aliases": ["qa.business", "demo.business"] // test in prod or live a lie
     }
     ```
-* `ttl` specifies the **TTL** in [golang duration strings](https://golang.org/pkg/time/#ParseDuration) returned for matching service queries, by default 5 minutes.
+* `ttl` (default: `5m`) specifies the **TTL** in [golang duration strings](https://golang.org/pkg/time/#ParseDuration) returned for matching service queries.
 
 ## Ready
 
@@ -131,6 +137,8 @@ consul {
 ~~~
 
 ## Consul configuration
+
+Services registered in the catalog and tagged with `TAG` will be served by this plugin. If `acl_metadata_tag` was configured in coredns, services must also provide that key as part of it's [metadata](https://developer.hashicorp.com/consul/api-docs/agent/service#meta).
 
 ### Consul ACL policy
 
