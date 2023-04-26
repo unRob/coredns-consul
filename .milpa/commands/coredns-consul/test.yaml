@@ -1,0 +1,13 @@
+summary: Runs unit tests
+description: |
+  Runs unit tests using gotestsum
+arguments:
+  - name: spec
+    default: ./...
+    description: the package to test
+    values:
+      dirs: "*"
+options:
+  coverage:
+    type: bool
+    description: if provided, will output coverage reports

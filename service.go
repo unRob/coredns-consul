@@ -4,6 +4,7 @@ package catalog
 
 import (
 	"net"
+	"strings"
 )
 
 // ServiceACL holds an action and corresponding network range.
@@ -18,6 +19,17 @@ type Service struct {
 	Target    string
 	ACL       []*ServiceACL
 	Addresses []net.IP
+}
+
+func NewService(name, target string) *Service {
+	svc := &Service{
+		Name:      name,
+		Target:    target,
+		ACL:       []*ServiceACL{},
+		Addresses: []net.IP{},
+	}
+
+	return svc
 }
 
 // RespondsTo returns if a service is allowed to talk to an IP.
@@ -40,4 +52,31 @@ func (s Service) RespondsTo(ip net.IP) bool {
 	}
 
 	return false
+}
+
+type ServiceMap map[string]*Service
+
+func (s ServiceMap) Find(query string) *Service {
+	if svc, ok := s[query]; ok {
+		return svc
+	}
+
+	if strings.Contains(query, ".") {
+		foundDot := false
+		starName := "*." + strings.TrimLeftFunc(query, func(r rune) bool {
+			if foundDot {
+				return false
+			}
+
+			if r == '.' {
+				foundDot = true
+			}
+			return true
+		})
+		if svc, ok := s[starName]; ok {
+			return svc
+		}
+	}
+
+	return nil
 }

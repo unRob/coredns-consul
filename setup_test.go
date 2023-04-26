@@ -4,6 +4,7 @@ package catalog
 
 import (
 	"net"
+	"strings"
 	"testing"
 
 	"github.com/coredns/caddy"
@@ -29,7 +30,7 @@ func TestSetup(t *testing.T) {
 			tags:        defaultTags,
 			endpoint:    defaultEndpoint,
 			ttl:         defaultTTL,
-			metaTag:     defaultMeta,
+			metaTag:     defaultACLTag,
 		},
 		{
 			input:       `consul_catalog some.tag`,
@@ -37,7 +38,7 @@ func TestSetup(t *testing.T) {
 			tags:        []string{"some.tag"},
 			endpoint:    defaultEndpoint,
 			ttl:         defaultTTL,
-			metaTag:     defaultMeta,
+			metaTag:     defaultACLTag,
 		},
 		{
 			input:       `consul_catalog some.tag other.tag`,
@@ -45,7 +46,7 @@ func TestSetup(t *testing.T) {
 			tags:        []string{"some.tag", "other.tag"},
 			endpoint:    defaultEndpoint,
 			ttl:         defaultTTL,
-			metaTag:     defaultMeta,
+			metaTag:     defaultACLTag,
 		},
 		{
 			input: `consul_catalog {
@@ -55,7 +56,7 @@ func TestSetup(t *testing.T) {
 			tags:        defaultTags,
 			endpoint:    "consul.local:1111",
 			ttl:         defaultTTL,
-			metaTag:     defaultMeta,
+			metaTag:     defaultACLTag,
 		},
 		{
 			input: `consul_catalog {
@@ -65,7 +66,7 @@ func TestSetup(t *testing.T) {
 			tags:        defaultTags,
 			endpoint:    defaultEndpoint,
 			ttl:         15,
-			metaTag:     defaultMeta,
+			metaTag:     defaultACLTag,
 		},
 		{
 
@@ -87,7 +88,7 @@ func TestSetup(t *testing.T) {
 			tags:        defaultTags,
 			endpoint:    defaultEndpoint,
 			ttl:         defaultTTL,
-			metaTag:     defaultMeta,
+			metaTag:     defaultACLTag,
 			networks: map[string]*net.IPNet{
 				"private": {IP: net.ParseIP("10.0.0.0"), Mask: net.IPv4Mask(255, 255, 255, 0)},
 				"public":  {IP: net.ParseIP("0.0.0.0"), Mask: net.IPv4Mask(0, 0, 0, 0)},
@@ -117,8 +118,10 @@ func TestSetup(t *testing.T) {
 				t.Fatalf("Expected no errors, but got: %v", err)
 			}
 
-			if catalog.Tag != tst.tags[0] {
-				t.Fatalf("Tags don't match: %v != %v", catalog.Tag, tst.tags[0])
+			lastSourceDesc := strings.Split(catalog.Sources[len(catalog.Sources)-1].Name(), " ")
+			lastSourceName := lastSourceDesc[len(lastSourceDesc)-1]
+			if lastSourceName != tst.tags[0] {
+				t.Fatalf("Tags don't match: %v != %v", lastSourceName, tst.tags[0])
 			}
 
 			if catalog.Endpoint != tst.endpoint {

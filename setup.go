@@ -1,4 +1,5 @@
 // Copyright © 2022 Roberto Hidalgo <coredns-consul@un.rob.mx>
+// Contributions by Charles Powell, 2023
 // SPDX-License-Identifier: Apache-2.0
 package catalog
 
@@ -10,12 +11,15 @@ import (
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
+	"github.com/coredns/coredns/plugin/metrics"
 	clog "github.com/coredns/coredns/plugin/pkg/log"
 )
 
-var Log = clog.NewWithPlugin("consul_catalog")
+var pluginName = "consul_catalog"
 
-func init() { plugin.Register("consul_catalog", setup) }
+var Log = clog.NewWithPlugin(pluginName)
+
+func init() { plugin.Register(pluginName, setup) }
 
 func setup(c *caddy.Controller) error {
 	catalog, err := parse(c)
@@ -30,47 +34,37 @@ func setup(c *caddy.Controller) error {
 		return catalog
 	})
 
-	onUpdateError := func(err error, cooldown time.Duration) {
-		Log.Errorf("Could not obtain services from catalog, retrying in %vs: %v", cooldown.Truncate(time.Second), err)
-	}
-
-	onUpdateKVError := func(err error, cooldown time.Duration) {
-		Log.Errorf("Could not obtain config from consul, retrying in %vs: %v", cooldown.Truncate(time.Second), err)
-	}
-
 	c.OnStartup(func() error {
-		Log.Infof("Starting consul catalog watch at %s", catalog.Endpoint)
+		Log.Infof("Starting %d consul catalog watches for %s", len(catalog.Sources), catalog.Endpoint)
 
-		go func() {
-			// poll for changes, backing off in case of failures
-			for {
-				Log.Debug("Waiting for consul catalog services...")
+		m := dnsserver.GetConfig(c).Handler("prometheus")
+		if m != nil {
+			catalog.metrics = m.(*metrics.Metrics)
+		}
 
-				err := backoff.RetryNotify(catalog.FetchServices, backoff.NewExponentialBackOff(), onUpdateError)
-
-				if err != nil {
-					Log.Error(plugin.Error("Failed to obtain services from catalog", err))
-					continue
-				}
-			}
-		}()
-
-		if catalog.ConfigKey != "" {
-			Log.Infof("Starting consul kv watch at %s/kv/%s", catalog.Endpoint, catalog.ConfigKey)
-
-			go func() {
-				// poll for changes, backing off in case of failures
+		for _, watch := range catalog.Sources {
+			go func(w *Watch) {
+				Log.Infof("Starting lookup for %s", w.Name())
 				for {
-					Log.Debug("Waiting for consul kv config...")
+					Log.Debugf("Looking up %s", w.Name())
 
-					err := backoff.RetryNotify(catalog.FetchConfig, backoff.NewExponentialBackOff(), onUpdateKVError)
+					onUpdateError := func(err error, cooldown time.Duration) {
+						Log.Errorf("Could not lookup %s, retrying in %vs: %v", w.Name(), cooldown.Truncate(time.Second), err)
+					}
+					err := backoff.RetryNotify(func() error {
+						_, err := w.Resolve(catalog)
+						return err
+					}, backoff.NewExponentialBackOff(), onUpdateError)
 
 					if err != nil {
-						Log.Error(plugin.Error("Failed to obtain kv config", err))
 						continue
 					}
+
+					catalog.Lock()
+					catalog.lastUpdate = time.Now()
+					catalog.Unlock()
 				}
-			}()
+			}(watch)
 		}
 		return nil
 	})
@@ -78,15 +72,16 @@ func setup(c *caddy.Controller) error {
 	return nil
 }
 
-func parse(c *caddy.Controller) (cc *Catalog, err error) {
+func parse(c *caddy.Controller) (cc *Catalog, err error) { // nolint: gocyclo
 	cc = New()
 
 	token := ""
 	networks := map[string]*net.IPNet{}
+	tag := defaultTag
 	for c.Next() {
 		tags := c.RemainingArgs()
 		if len(tags) > 0 {
-			cc.Tag = tags[0]
+			tag = tags[0]
 		}
 
 		for c.NextBlock() {
@@ -120,7 +115,7 @@ func parse(c *caddy.Controller) (cc *Catalog, err error) {
 				if !c.NextArg() {
 					return nil, c.ArgErr()
 				}
-				cc.MetadataTag = c.Val()
+				cc.ACLTag = c.Val()
 			case "acl_zone":
 				remaining := c.RemainingArgs()
 				if len(remaining) < 1 {
@@ -142,17 +137,35 @@ func parse(c *caddy.Controller) (cc *Catalog, err error) {
 				cc.ProxyTag = remaining[0]
 				cc.ProxyService = remaining[1]
 				Log.Debugf("Found proxy config for tag %s and service %s", cc.ProxyTag, cc.ProxyService)
-			case "config_kv_path":
+			case "alias_metadata_tag":
+				if !c.NextArg() {
+					return nil, c.ArgErr()
+				}
+				cc.AliasTag = c.Val()
+			case "static_entries_path":
 				if !c.NextArg() {
 					return nil, c.ArgErr()
 				}
 
-				cc.ConfigKey = c.Val()
+				kvPath := c.Val()
+				watcher := NewWatch(&WatchKVPath{Key: kvPath})
+				cc.Sources = append(cc.Sources, watcher)
+			case "static_entries_prefix":
+				if !c.NextArg() {
+					return nil, c.ArgErr()
+				}
+
+				prefix := c.Val()
+				watcher := NewWatch(&WatcKVPrefix{Prefix: prefix})
+				cc.Sources = append(cc.Sources, watcher)
 			default:
 				return nil, c.Errf("unknown property %q", c.Val())
 			}
 		}
 	}
+
+	// Add catalog services watcher last
+	cc.Sources = append(cc.Sources, NewWatch(&WatchConsulCatalog{Tag: tag}))
 
 	cc.Networks = networks
 

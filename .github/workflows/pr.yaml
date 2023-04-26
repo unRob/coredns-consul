@@ -1,0 +1,37 @@
+on:
+  push:
+    branches:
+      - '**'
+      - '!gh-pages'
+name: Tests
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.20.x
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3.4.0
+        with:
+          skip-pkg-cache: true
+          version: v1.51.2
+          args: --timeout 3m --verbose
+
+      - name: Unit tests
+        run: |
+          curl -L https://milpa.dev/install.sh | bash -
+          go install gotest.tools/gotestsum@latest
+          milpa coredns-consul test --coverage
+
+      - name: Send coverage
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: coverage.out

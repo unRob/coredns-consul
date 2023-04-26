@@ -1,0 +1,24 @@
+summary: builds coredns with this plugin
+description: |
+  checks out coredns and includes the code in this repo
+arguments:
+  - name: targets
+    description: os/arch pairs to build for
+    required: true
+    variadic: true
+    default: [linux/mips64, darwin/arm64]
+    values:
+      static:
+        - all
+        - linux/mips64
+        - linux/arm64
+        - linux/arm
+        - linux/amd64
+        - darwin/amd64
+        - darwin/arm64
+options:
+  clone-protocol:
+    description: the protocol to use when cloning coredns
+    default: ssh
+    values:
+      static: [ssh, https]
