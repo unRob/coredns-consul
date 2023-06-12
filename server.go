@@ -15,6 +15,46 @@ import (
 	"github.com/miekg/dns"
 )
 
+func ProxiedAddressesByProximity(source net.IP, svc *Service, target *Service, header dns.RR_Header) []dns.RR {
+	addressWeights := map[string]int{}
+
+	for _, addr := range svc.Addresses {
+		if addr.Equal(source) {
+			addressWeights[addr.String()] = 2
+		} else {
+			if _, ok := addressWeights[addr.String()]; !ok {
+				addressWeights[addr.String()] = 1
+			}
+		}
+	}
+	head := []dns.RR{}
+	middle := []dns.RR{}
+	tail := []dns.RR{}
+	for _, addr := range target.Addresses {
+		record := &dns.A{
+			Hdr: header,
+			A:   addr,
+		}
+		weight, ok := addressWeights[addr.String()]
+		if !ok {
+			weight = 0
+		}
+		switch weight {
+		case 2:
+			head = append(head, record)
+		case 1:
+			middle = append(middle, record)
+		case 0:
+			tail = append(tail, record)
+		}
+	}
+	res := []dns.RR{}
+	res = append(res, head...)
+	res = append(res, middle...)
+	res = append(res, tail...)
+	return res
+}
+
 // ServeDNS implements plugin.Handler.
 func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	state := request.Request{W: w, Req: r, Zone: c.Zone}
@@ -31,8 +71,8 @@ func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 		return plugin.NextOrFailure("consul_catalog", c.Next, ctx, w, r)
 	}
 
+	ip := net.ParseIP(state.IP())
 	if len(c.Networks) > 0 {
-		ip := net.ParseIP(state.IP())
 		if !svc.RespondsTo(ip) {
 			Log.Warningf("Blocked resolution for service %s from ip %s", name, ip)
 			RequestACLDeniedCount.WithLabelValues(metrics.WithServer(ctx), metrics.WithView(ctx)).Inc()
@@ -71,6 +111,7 @@ func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 	}
 
 	lookupName := svc.Target
+
 	if svc.Target == "@service_proxy" {
 		lookupName = c.ProxyService
 	}
@@ -81,12 +122,18 @@ func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 	if target := c.ServiceFor(lookupName); target != nil && len(target.Addresses) > 0 {
 		Log.Debugf("Found addresses in catalog for %s: %v", lookupName, target.Addresses)
 		source = "api"
-		for _, addr := range target.Addresses {
-			m.Answer = append(m.Answer, &dns.A{
-				Hdr: header,
-				A:   addr,
-			})
+
+		if lookupName == "@service_proxy" {
+			m.Answer = append(m.Answer, ProxiedAddressesByProximity(ip, svc, target, header)...)
+		} else {
+			for _, addr := range target.Addresses {
+				m.Answer = append(m.Answer, &dns.A{
+					Hdr: header,
+					A:   addr,
+				})
+			}
 		}
+
 	} else {
 		Log.Debugf("Looking up address for %s upstream", lookupName)
 		reply, err := DefaultLookup(ctx, state, fmt.Sprintf("%s.service.consul", lookupName))
