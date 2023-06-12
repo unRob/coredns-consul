@@ -47,8 +47,8 @@ func TestFetchServices(t *testing.T) {
 	}
 
 	svcTests := map[string]string{
-		"nomad":          serviceProxyName,
-		serviceProxyName: serviceProxyName,
+		"nomad":          ServiceProxyTag,
+		serviceProxyName: ServiceProxyTag,
 		"git":            "git",
 	}
 	for svc, expected := range svcTests {
