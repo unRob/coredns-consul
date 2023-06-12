@@ -11,7 +11,6 @@ import (
 )
 
 func TestProxiedAddressesByProximity(t *testing.T) {
-
 	proxy := &Service{
 		Name: "proxy",
 		Addresses: []net.IP{
@@ -126,5 +125,4 @@ func TestProxiedAddressesByProximity(t *testing.T) {
 			}
 		})
 	}
-
 }

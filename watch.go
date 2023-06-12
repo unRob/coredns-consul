@@ -15,6 +15,8 @@ import (
 	"github.com/hashicorp/consul/api"
 )
 
+const ServiceProxyTag = "@service_proxy"
+
 type WatchType interface {
 	Name() string
 	Fetch(*Catalog, *api.QueryOptions) (uint64, error)
@@ -108,7 +110,7 @@ func staticEntriesToServiceMap(c *Catalog, entries StaticEntries) (ServiceMap, [
 	found := []string{}
 	for name, entry := range entries {
 		target := entry.Target
-		if target == "@service_proxy" {
+		if target == ServiceProxyTag {
 			if c.ProxyService == "" {
 				Log.Warningf("Ignoring service %s. Requested service proxy but none is configured", name)
 				continue

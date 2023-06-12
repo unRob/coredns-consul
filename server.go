@@ -112,7 +112,7 @@ func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 
 	lookupName := svc.Target
 
-	if svc.Target == "@service_proxy" {
+	if svc.Target == ServiceProxyTag {
 		lookupName = c.ProxyService
 	}
 
@@ -123,7 +123,7 @@ func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 		Log.Debugf("Found addresses in catalog for %s: %v", lookupName, target.Addresses)
 		source = "api"
 
-		if lookupName == "@service_proxy" {
+		if lookupName == ServiceProxyTag {
 			m.Answer = append(m.Answer, ProxiedAddressesByProximity(ip, svc, target, header)...)
 		} else {
 			for _, addr := range target.Addresses {
@@ -133,7 +133,6 @@ func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 				})
 			}
 		}
-
 	} else {
 		Log.Debugf("Looking up address for %s upstream", lookupName)
 		reply, err := DefaultLookup(ctx, state, fmt.Sprintf("%s.service.consul", lookupName))
