@@ -239,10 +239,12 @@ func (src *WatchConsulCatalog) Process(catalog *Catalog) (ServiceMap, []string, 
 			switch tag {
 			case catalog.ProxyTag:
 				if catalog.ProxyTag != "" {
-					target = catalog.ProxyService
+					target = ServiceProxyTag
 				}
 			case src.Tag:
 				exposed = true
+			default:
+				Log.Debugf("ignoring unknown tag %s for svc %s", tag, svc)
 			}
 		}
 
@@ -291,6 +293,7 @@ func (src *WatchConsulCatalog) Process(catalog *Catalog) (ServiceMap, []string, 
 		}
 
 		services[svc] = service
+		Log.Debugf("serving: %+v", service)
 		found = append(found, svc)
 	}
 

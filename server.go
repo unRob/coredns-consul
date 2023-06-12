@@ -11,6 +11,7 @@ import (
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/plugin/file"
 	"github.com/coredns/coredns/plugin/metrics"
+	"github.com/coredns/coredns/plugin/pkg/log"
 	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
 )
@@ -71,6 +72,8 @@ func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 		return plugin.NextOrFailure("consul_catalog", c.Next, ctx, w, r)
 	}
 
+	log.Debugf("Found target service: %+v", svc)
+
 	ip := net.ParseIP(state.IP())
 	if len(c.Networks) > 0 {
 		if !svc.RespondsTo(ip) {
@@ -123,7 +126,7 @@ func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 		Log.Debugf("Found addresses in catalog for %s: %v", lookupName, target.Addresses)
 		source = "api"
 
-		if lookupName == ServiceProxyTag {
+		if svc.Target == ServiceProxyTag {
 			m.Answer = append(m.Answer, ProxiedAddressesByProximity(ip, svc, target, header)...)
 		} else {
 			for _, addr := range target.Addresses {
@@ -142,8 +145,8 @@ func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 		}
 		Log.Debugf("Found record for %s upstream", name)
 
+		source = "dns"
 		for _, a := range reply.Answer {
-			source = "dns"
 			record, ok := a.(*dns.A)
 			if !ok {
 				Log.Warningf("Found non-A record upstream: %s", a.String())
