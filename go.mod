@@ -8,7 +8,7 @@ require (
 	github.com/coredns/coredns v1.10.1
 	github.com/hashicorp/consul/api v1.21.0
 	github.com/miekg/dns v1.1.54
-	github.com/prometheus/client_golang v1.15.1
+	github.com/prometheus/client_golang v1.16.0
 )
 
 require (
