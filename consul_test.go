@@ -39,6 +39,28 @@ func TestFetchStaticServiceKey(t *testing.T) {
 			t.Fatalf("Unexpected address for static-addr: %v", ip)
 		}
 	})
+
+	t.Run("invalid static addresses", func(t *testing.T) {
+		svc := c.ServiceFor("static-addr-invalid")
+		if svc == nil {
+			t.Fatalf("Service static-addr-invalid not found, got: %+v", c.Services())
+		}
+
+		if len(svc.Addresses) != 1 {
+			t.Fatalf("Unexpected addresses for static-addr-invalid: %v", svc.Target)
+		}
+
+		if ip := svc.Addresses[0].String(); ip != "127.0.0.1" {
+			t.Fatalf("Unexpected address for static-addr-invalid: %v", ip)
+		}
+	})
+
+	t.Run("ignored static", func(t *testing.T) {
+		svc := c.ServiceFor("static-ignored")
+		if svc != nil {
+			t.Fatalf("Service static-addr found with invalid config, got: %+v", c.Services())
+		}
+	})
 }
 
 func TestFetchStaticServicePrefix(t *testing.T) {

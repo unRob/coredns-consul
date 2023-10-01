@@ -155,8 +155,13 @@ func NewTestKVClient() KVClient {
 	return &testKVClient{
 		Keys: map[string]*api.KVPair{
 			"static/path": {
-				Key:   "static/path",
-				Value: []byte(`{"static-consul": {"target": "traefik", "acl": ["allow private"]}, "static-addr": {"addresses": ["127.0.0.1"], "acl": ["allow private"]}}`),
+				Key: "static/path",
+				Value: []byte(`{
+					"static-consul": {"target": "traefik", "acl": ["allow private"]},
+					"static-addr": {"addresses": ["127.0.0.1"], "acl": ["allow private"]},
+					"static-addr-invalid": {"addresses": ["not-an-ip", "127.0.0.1"], "acl": ["allow private"]},
+					"static-ignored": {"acl": ["allow private"]}
+				}`),
 			},
 		},
 		Prefixes: map[string]api.KVPairs{
