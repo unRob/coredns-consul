@@ -136,6 +136,15 @@ func (c *Catalog) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 				})
 			}
 		}
+	} else if len(svc.Addresses) > 0 {
+		Log.Debugf("Found addresses in static entry for %s: %v", svc.Name, svc.Addresses)
+		source = "kv"
+		for _, addr := range svc.Addresses {
+			m.Answer = append(m.Answer, &dns.A{
+				Hdr: header,
+				A:   addr,
+			})
+		}
 	} else {
 		Log.Debugf("Looking up address for %s upstream", lookupName)
 		reply, err := DefaultLookup(ctx, state, fmt.Sprintf("%s.service.consul", lookupName))

@@ -43,9 +43,9 @@ consul_catalog [TAGS...] {
     # Services can have multiple names
     alias_metadata_tag META_TAG_NAME
 
-    # Or be fetched from the KV store at a path or prefix
+    # Or be fetched from the KV store at a path or prefix (ending in /)
     static_entries_path CONSUL_KV_PATH
-    static_entries_prefix CONSUL_KV_PREFIX
+    static_entries_prefix CONSUL_KV_PREFIX/
 
     # finally, records served can be attached with a default ttl
     ttl TTL
@@ -68,7 +68,11 @@ consul_catalog [TAGS...] {
         },
         "myServiceProxyService": {
             "target": "@service_proxy", // a run-time alias for acl_zone's PROXY_SERVICE
-            "acl": ["allow network1"],
+            "acl": ["allow network1"]
+        },
+        "my-a-record": {
+          "addresses": ["127.0.0.1"], // static addresses for this name; no `target` is provided,
+          "acl": ["allow network1"]
         }
     }
     ```
@@ -77,7 +81,8 @@ consul_catalog [TAGS...] {
     {
         "target": "serviceC", // the name of a service registered with consul
         "acl": ["allow network1", "deny network2"], // a list of ACL rules
-        "aliases": ["qa.business", "demo.business"] // test in prod or live a lie
+        "aliases": ["qa.business", "demo.business"], // test in prod or live a lie
+        // "addresses": ["127.0.0.1"] // static addresses for this name, if no `target` was provided
     }
     ```
 * `ttl` (default: `5m`) specifies the **TTL** in [golang duration strings](https://golang.org/pkg/time/#ParseDuration) returned for matching service queries.
@@ -111,8 +116,8 @@ example.com {
         acl_zone iot 192.168.20.0/24
         acl_zone public 0.0.0.0/0
 
-        static_entries_path dns/all-static-records
-        static_entries_prefix dns/records
+        static_entries_path dns-records
+        static_entries_prefix dns/records/
 
         ttl 10m
     }
@@ -153,10 +158,12 @@ node_prefix "" {
 }
 
 // When using static_entries_(path|prefix), access to the given path/prefix should be granted
-key "dns/all-static-records" {
+// for a path:
+key "dns-records" {
   policy = "read"
 }
 
+// for a prefix:
 key_prefix "dns/records" {
   policy = "read"
 }

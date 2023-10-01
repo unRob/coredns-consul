@@ -5,6 +5,7 @@ package catalog
 
 import (
 	"net"
+	"strings"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -155,7 +156,7 @@ func parse(c *caddy.Controller) (cc *Catalog, err error) { // nolint: gocyclo
 					return nil, c.ArgErr()
 				}
 
-				prefix := c.Val()
+				prefix := strings.TrimSuffix(c.Val(), "/") + "/"
 				watcher := NewWatch(&WatcKVPrefix{Prefix: prefix})
 				cc.Sources = append(cc.Sources, watcher)
 			default:
@@ -176,7 +177,7 @@ func parse(c *caddy.Controller) (cc *Catalog, err error) { // nolint: gocyclo
 	cc.SetClients(catalogClient, kvClient)
 
 	for _, server := range c.ServerBlockKeys {
-		cc.FQDN = append(cc.FQDN, plugin.Host(server).Normalize())
+		cc.FQDN = append(cc.FQDN, plugin.Host(server).NormalizeExact()...)
 	}
 
 	return cc, nil
