@@ -110,14 +110,33 @@ func staticEntriesToServiceMap(c *Catalog, entries StaticEntries) (ServiceMap, [
 	found := []string{}
 	for name, entry := range entries {
 		target := entry.Target
-		if target == ServiceProxyTag {
-			if c.ProxyService == "" {
-				Log.Warningf("Ignoring service %s. Requested service proxy but none is configured", name)
-				continue
+		addresses := entry.Addresses
+		if len(addresses) == 0 && target == "" {
+			Log.Warningf("Ignoring service %s, no target or addresses found!", name)
+			continue
+		}
+
+		if target != "" {
+			if target == ServiceProxyTag {
+				if c.ProxyService == "" {
+					Log.Warningf("Ignoring service %s. Requested service proxy but none is configured", name)
+					continue
+				}
 			}
 		}
 
 		service := NewService(name, target)
+
+		if len(addresses) > 0 {
+			for _, addrStr := range addresses {
+				ip := net.ParseIP(addrStr)
+				if ip == nil {
+					Log.Warningf("Ignoring address %s for static service %s: could not parse IP", addrStr, name)
+					continue
+				}
+				service.Addresses = append(service.Addresses, ip)
+			}
+		}
 
 		if c.ACLTag != "" {
 			err := c.parseACL(service, entry.ACL)

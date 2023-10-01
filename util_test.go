@@ -114,7 +114,7 @@ func (c *testCatalogClient) DeleteService(name string) {
 	delete(c.services, name)
 }
 
-func (c *testCatalogClient) Service(name string, tag string, opts *api.QueryOptions) ([]*api.CatalogService, *api.QueryMeta, error) {
+func (c *testCatalogClient) Service(name string, _ string, _ *api.QueryOptions) ([]*api.CatalogService, *api.QueryMeta, error) {
 	sd, ok := c.services[name]
 	if !ok {
 		return []*api.CatalogService{}, nil, fmt.Errorf("Not found")
@@ -156,7 +156,7 @@ func NewTestKVClient() KVClient {
 		Keys: map[string]*api.KVPair{
 			"static/path": {
 				Key:   "static/path",
-				Value: []byte(`{"static-consul": {"target": "traefik", "acl": ["allow private"]}}`),
+				Value: []byte(`{"static-consul": {"target": "traefik", "acl": ["allow private"]}, "static-addr": {"addresses": ["127.0.0.1"], "acl": ["allow private"]}}`),
 			},
 		},
 		Prefixes: map[string]api.KVPairs{
@@ -170,12 +170,12 @@ func NewTestKVClient() KVClient {
 	}
 }
 
-func (kv *testKVClient) Get(path string, opts *api.QueryOptions) (*api.KVPair, *api.QueryMeta, error) {
+func (kv *testKVClient) Get(path string, _ *api.QueryOptions) (*api.KVPair, *api.QueryMeta, error) {
 	kv.keysIndex++
 	return kv.Keys[path], &api.QueryMeta{LastIndex: kv.keysIndex}, nil
 }
 
-func (kv *testKVClient) List(prefix string, opts *api.QueryOptions) (api.KVPairs, *api.QueryMeta, error) {
+func (kv *testKVClient) List(prefix string, _ *api.QueryOptions) (api.KVPairs, *api.QueryMeta, error) {
 	kv.prefixIndex++
 	return kv.Prefixes[prefix], &api.QueryMeta{LastIndex: kv.prefixIndex}, nil
 }

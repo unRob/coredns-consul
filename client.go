@@ -48,9 +48,10 @@ func CreateClient(scheme, endpoint, token string) (catalog Client, kv KVClient, 
 
 // StaticEntry represents a consul value, json encoded.
 type StaticEntry struct {
-	Target  string   `json:"target"`
-	ACL     []string `json:"acl"`
-	Aliases []string `json:"aliases"`
+	Target    string   `json:"target"`
+	Addresses []string `json:"addresses"`
+	ACL       []string `json:"acl"`
+	Aliases   []string `json:"aliases"`
 }
 
 type StaticEntries map[string]*StaticEntry
