@@ -22,7 +22,7 @@ func TestSetup(t *testing.T) {
 		endpoint    string
 		ttl         uint32
 		metaTag     string
-		networks    map[string]*net.IPNet
+		networks    map[string][]*net.IPNet
 	}{
 		{
 			input:       `consul_catalog`,
@@ -82,6 +82,7 @@ func TestSetup(t *testing.T) {
 		{
 			input: `consul_catalog {
 				acl_zone private 10.0.0.1/24
+				acl_zone multiple 172.16.0.0/12 192.168.0.0/16
 				acl_zone public 0.0.0.0/0
 			}`,
 			shouldError: false,
@@ -89,9 +90,17 @@ func TestSetup(t *testing.T) {
 			endpoint:    defaultEndpoint,
 			ttl:         defaultTTL,
 			metaTag:     defaultACLTag,
-			networks: map[string]*net.IPNet{
-				"private": {IP: net.ParseIP("10.0.0.0"), Mask: net.IPv4Mask(255, 255, 255, 0)},
-				"public":  {IP: net.ParseIP("0.0.0.0"), Mask: net.IPv4Mask(0, 0, 0, 0)},
+			networks: map[string][]*net.IPNet{
+				"private": {
+					{IP: net.ParseIP("10.0.0.0"), Mask: net.IPv4Mask(255, 255, 255, 0)},
+				},
+				"multiple": {
+					{IP: net.ParseIP("172.16.0.0"), Mask: net.IPv4Mask(255, 240, 0, 0)},
+					{IP: net.ParseIP("192.168.0.0"), Mask: net.IPv4Mask(255, 255, 0, 0)},
+				},
+				"public": {
+					{IP: net.ParseIP("0.0.0.0"), Mask: net.IPv4Mask(0, 0, 0, 0)},
+				},
 			},
 		},
 		{
@@ -132,11 +141,19 @@ func TestSetup(t *testing.T) {
 				t.Fatalf("TTL doesn't match: %v != %v", catalog.TTL, tst.ttl)
 			}
 
-			for name, cidr := range catalog.Networks {
+			for name, cidrRanges := range catalog.Networks {
 				if expectedCIDR, ok := tst.networks[name]; !ok {
 					t.Fatalf("Networks missing %s", name)
-				} else if expectedCIDR.String() != cidr.String() {
-					t.Fatalf("Wrong CIDR found: %s, expected %s", cidr, expectedCIDR)
+				} else {
+					if len(expectedCIDR) != len(cidrRanges) {
+						t.Fatalf("expected %d ranges, got %d", len(expectedCIDR), len(cidrRanges))
+					}
+					for idx, parsed := range cidrRanges {
+						expected := expectedCIDR[idx]
+						if parsed.String() != expected.String() {
+							t.Fatalf("Wrong CIDR found: %s, expected %s", parsed, expected)
+						}
+					}
 				}
 			}
 		})

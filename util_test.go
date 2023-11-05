@@ -15,13 +15,13 @@ func NewTestCatalog(fetch bool, extraSources ...*Watch) (*Catalog, Client, KVCli
 	c.FQDN = []string{"example.com."}
 	c.ProxyTag = "traefik.enable=true"
 	c.ProxyService = "traefik"
-	c.Networks = map[string]*net.IPNet{}
+	c.Networks = map[string][]*net.IPNet{}
 	_, private, _ := net.ParseCIDR("192.168.100.0/24")
-	c.Networks["private"] = private
+	c.Networks["private"] = []*net.IPNet{private}
 	_, guest, _ := net.ParseCIDR("192.168.1.0/24")
-	c.Networks["guest"] = guest
+	c.Networks["guest"] = []*net.IPNet{guest}
 	_, public, _ := net.ParseCIDR("0.0.0.0/0")
-	c.Networks["public"] = public
+	c.Networks["public"] = []*net.IPNet{public}
 	client := NewTestCatalogClient()
 	kvClient := NewTestKVClient()
 	c.SetClients(client, kvClient)
