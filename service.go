@@ -9,8 +9,8 @@ import (
 
 // ServiceACL holds an action and corresponding network range.
 type ServiceACL struct {
-	Action  string
-	Network *net.IPNet
+	Action   string
+	Networks []*net.IPNet
 }
 
 // Service has a target and ACL rules.
@@ -36,17 +36,19 @@ func NewService(name, target string) *Service {
 func (s Service) RespondsTo(ip net.IP) bool {
 	Log.Debugf("Evaluating %d rules", len(s.ACL))
 	for _, acl := range s.ACL {
-		Log.Debugf("Evaluating %s", acl.Network)
-		if acl.Network.Contains(ip) {
-			switch acl.Action {
-			case "allow":
-				Log.Debugf("Allowed %s from %s", ip, acl.Network)
-				return true
-			case "deny":
-				Log.Debugf("Denied %s from %s", ip, acl.Network)
-				return false
-			default:
-				Log.Errorf("unknown acl action: %s", acl.Action)
+		Log.Debugf("Evaluating %s", acl.Networks)
+		for _, net := range acl.Networks {
+			if net.Contains(ip) {
+				switch acl.Action {
+				case "allow":
+					Log.Debugf("Allowed %s from %s", ip, acl.Networks)
+					return true
+				case "deny":
+					Log.Debugf("Denied %s from %s", ip, acl.Networks)
+					return false
+				default:
+					Log.Errorf("unknown acl action: %s", acl.Action)
+				}
 			}
 		}
 	}

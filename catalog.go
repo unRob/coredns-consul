@@ -40,7 +40,7 @@ type Catalog struct {
 	Token        string
 	ProxyService string
 	ProxyTag     string
-	Networks     map[string]*net.IPNet
+	Networks     map[string][]*net.IPNet
 	ACLTag       string
 	AliasTag     string
 	Next         plugin.Handler
@@ -146,10 +146,10 @@ func (c *Catalog) parseACL(svc *Service, rules []string) error {
 		}
 		action := ruleParts[0]
 		for _, networkName := range regexp.MustCompile(`,\s*`).Split(ruleParts[1], -1) {
-			if cidr, ok := c.Networks[networkName]; ok {
+			if ranges, ok := c.Networks[networkName]; ok {
 				svc.ACL = append(svc.ACL, &ServiceACL{
-					Action:  action,
-					Network: cidr,
+					Action:   action,
+					Networks: ranges,
 				})
 			} else {
 				return fmt.Errorf("unknown network %s", networkName)

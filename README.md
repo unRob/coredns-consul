@@ -35,7 +35,7 @@ consul_catalog [TAGS...] {
 
     # ACL configuration
     acl_metadata_tag META_TAG
-    acl_zone ZONE_NAME ZONE_CIDR
+    acl_zone ZONE_NAME ZONE_CIDR [ZONE_CIDR...]
 
     # Service proxy allows static services to target a Catalog service
     service_proxy PROXY_TAG PROXY_SERVICE
@@ -55,7 +55,7 @@ consul_catalog [TAGS...] {
 * `endpoint` (default `consul.service.consul:8500`) specifies the host and port where to find consul catalog.
 * `token` specifies the token to authenticate with the consul service, having at least .
 * `acl_metadata_tag` (default: `coredns-acl`) specifies the Consul Metadata tag to read ACL rules from. An ACL rule looks like: `allow network1; deny network2`. Rules are interpreted in order of appearance. If specified, requests will only receive answers when their IP address corresponds to any of the allowed `acl_zone`s' CIDR ranges for a service.
-* `acl_zone` adds an ACL zone named **ZONE_NAME** with corresponding **ZONE_CIDR** range.
+* `acl_zone` adds an ACL zone named **ZONE_NAME** with corresponding **ZONE_CIDR** range(s).
 * `service_proxy` If specified, services tagged with **PROXY_TAG** will respond with the address for **PROXY_SERVICE** instead.
 * `alias_metadata_tag` (default: `coredns-alias`) specifies the Consul Metadata tag to read aliases to setup for service. Aliases are semicolon separated dns prefixes that reply with the same target as the original service. For example: `coredns-alias = "*.myservice; client.myservice"`. Aliases that begin with `*.`, are treated as a wildcard prefix that will match any sub-domains of the `zone` (and/or dots after the `*.` prefix).
 * `static_entries_path` If specified, consul's kv store will be queried at **CONSUL_KV_PATH** and specified entries will be served before querying for catalog records. The value at **CONSUL_KV_PATH** must contain json following this schema:
@@ -67,7 +67,7 @@ consul_catalog [TAGS...] {
             "aliases": ["*.static"] // a list of other names that should also reply with this service's info
         },
         "myServiceProxyService": {
-            "target": "@service_proxy", // a run-time alias for acl_zone's PROXY_SERVICE
+            "target": "@service_proxy", // a run-time alias for service_proxy's PROXY_SERVICE
             "acl": ["allow network1"]
         },
         "my-a-record": {
@@ -110,8 +110,8 @@ example.com {
 
         // Enable ACL
         acl_metada_tag coredns-consul
-        // A service with `coredns-acl = "trusted" will only reply to clients in 10.0.0.0/24
-        acl_zone trusted 10.0.0.0/24
+        // A service with `coredns-acl = "trusted" will only reply to clients in the listed cidr ranges
+        acl_zone trusted 10.0.0.0/24 10.0.10.0/24 176.16.0.0/24
         acl_zone guests 192.168.10.0/24
         acl_zone iot 192.168.20.0/24
         acl_zone public 0.0.0.0/0

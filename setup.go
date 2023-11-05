@@ -77,7 +77,7 @@ func parse(c *caddy.Controller) (cc *Catalog, err error) { // nolint: gocyclo
 	cc = New()
 
 	token := ""
-	networks := map[string]*net.IPNet{}
+	networks := map[string][]*net.IPNet{}
 	tag := defaultTag
 	for c.Next() {
 		tags := c.RemainingArgs()
@@ -122,13 +122,19 @@ func parse(c *caddy.Controller) (cc *Catalog, err error) { // nolint: gocyclo
 				if len(remaining) < 1 {
 					return nil, c.Errf("must supply a name and cidr range for acl_zone")
 				}
-				name := remaining[0]
-				_, network, err := net.ParseCIDR(remaining[1])
-				if err != nil {
-					return nil, c.Errf("unable to parse network range <%s>", remaining[1])
-				}
 
-				networks[name] = network
+				zoneName := remaining[0]
+				networks[zoneName] = []*net.IPNet{}
+				for idx, netRange := range remaining {
+					if idx == 0 {
+						continue
+					}
+					_, network, err := net.ParseCIDR(netRange)
+					if err != nil {
+						return nil, c.Errf("unable to parse network range <%s> of acl zone <%s>", netRange, zoneName)
+					}
+					networks[zoneName] = append(networks[zoneName], network)
+				}
 			case "service_proxy":
 				remaining := c.RemainingArgs()
 				if len(remaining) < 1 {
