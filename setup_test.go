@@ -142,17 +142,17 @@ func TestSetup(t *testing.T) {
 			}
 
 			for name, cidrRanges := range catalog.Networks {
-				if expectedCIDR, ok := tst.networks[name]; !ok {
+				expectedCIDR, ok := tst.networks[name]
+				if !ok {
 					t.Fatalf("Networks missing %s", name)
-				} else {
-					if len(expectedCIDR) != len(cidrRanges) {
-						t.Fatalf("expected %d ranges, got %d", len(expectedCIDR), len(cidrRanges))
-					}
-					for idx, parsed := range cidrRanges {
-						expected := expectedCIDR[idx]
-						if parsed.String() != expected.String() {
-							t.Fatalf("Wrong CIDR found: %s, expected %s", parsed, expected)
-						}
+				}
+				if len(expectedCIDR) != len(cidrRanges) {
+					t.Fatalf("expected %d ranges, got %d", len(expectedCIDR), len(cidrRanges))
+				}
+				for idx, parsed := range cidrRanges {
+					expected := expectedCIDR[idx]
+					if parsed.String() != expected.String() {
+						t.Fatalf("Wrong CIDR found: %s, expected %s", parsed, expected)
 					}
 				}
 			}
