@@ -25,7 +25,6 @@ linters:
     - nakedret
     - nilerr
     - prealloc
-    - revive
     - staticcheck
     - stylecheck
     - tagliatelle
