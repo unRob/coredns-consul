@@ -28,7 +28,7 @@ jobs:
           milpa coredns-consul build all --verbose --clone-protocol https
 
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/*.tgz
