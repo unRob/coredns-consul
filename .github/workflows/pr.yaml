@@ -21,8 +21,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6.1.0
         with:
-          skip-pkg-cache: true
-          version: v1.58.2
+          version: v1.64.5
           args: --timeout 3m --verbose
 
       - name: Unit tests

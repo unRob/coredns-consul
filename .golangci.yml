@@ -10,7 +10,7 @@ linters:
   fast: false
   enable:
     - errcheck
-    - exportloopref
+    - copyloopvar
     - goconst
     - gocritic
     - gocyclo
