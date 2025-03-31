@@ -2,13 +2,13 @@ module github.com/unRob/coredns-consul
 
 go 1.23.0
 
-toolchain go1.23.6
+toolchain go1.24.1
 
 require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/coredns/caddy v1.1.2-0.20241029205200-8de985351a98
 	github.com/coredns/coredns v1.12.0
-	github.com/hashicorp/consul/api v1.31.2
+	github.com/hashicorp/consul/api v1.32.0
 	github.com/miekg/dns v1.1.63
 	github.com/prometheus/client_golang v1.20.5
 )
